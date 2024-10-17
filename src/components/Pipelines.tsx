@@ -13,9 +13,10 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { fetchPipelines } from '../services/api';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+
 import { useNavigate } from 'react-router-dom';
 import { useTrail, animated, config } from 'react-spring';
+import { Helmet } from 'react-helmet';
 
 interface Pipeline {
   uuid: string;
@@ -83,113 +84,118 @@ const Pipelines: React.FC = () => {
   }
 
   return (
-    <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ color: 'white', fontWeight: 'bold' }}>
-        Pipelines
-      </Typography>
-      <Grid container spacing={3} justifyContent="start" alignItems="center">
-        {trail.map((style, index) => (
-          <AnimatedGrid
-            size={{xs:12, sm:6, md:4, lg:3}}
-            columnSpacing={{xs:12, sm:6, md:4, lg:3}}
-            rowSpacing={{xs:12, sm:6, md:4, lg:3}}
-            key={pipelines[index].uuid}
-            container
-            justifyContent="center"
-            alignItems="center"
-            style={style}
-          >
-            <Card 
-              sx={{ 
-                height: '100%',
-                width: '100%',
-                display: 'flex', 
-                flexDirection: 'column',
-                cursor: 'pointer'
-              }}
-              onClick={() => handlePipelineClick(pipelines[index].uuid)}
+    <>
+      <Helmet>
+        <title>Pipelines - Pipeline Manager</title>
+      </Helmet>
+      <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
+        <Typography variant="h4" gutterBottom sx={{ color: 'white', fontWeight: 'bold' }}>
+          Pipelines
+        </Typography>
+        <Grid container spacing={3} justifyContent="start" alignItems="center">
+          {trail.map((style, index) => (
+            <AnimatedGrid
+              size={{xs:12, sm:6, md:4, lg:3}}
+              columnSpacing={{xs:12, sm:6, md:4, lg:3}}
+              rowSpacing={{xs:12, sm:6, md:4, lg:3}}
+              key={pipelines[index].uuid}
+              container
+              justifyContent="center"
+              alignItems="center"
+              style={style}
             >
-              <CardContent sx={{ flexGrow: 1, width: '100%', textAlign: 'left' }}>
-                <Typography variant="h6" component="div" gutterBottom noWrap>
-                  {pipelines[index].name}
-                </Typography>
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary"
-                  sx={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    height: '3em',
-                  }}
-                >
-                  {pipelines[index].description || 'No description available'}
-                </Typography>
-                {pipelines[index].status && (
-                  <Box display="flex" justifyContent="center" mt={1}>
-                    <Chip 
-                      label={pipelines[index].status} 
-                      color={pipelines[index].status === 'active' ? 'success' : 'default'}
-                      size="small"
-                    />
-                  </Box>
-                )}
-              </CardContent>
-              <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
-                {/* <Button size="small" variant="contained" startIcon={<PlayArrowIcon />}>
-                  Run
-                </Button> */}
-                {pipelines[index].tags && pipelines[index].tags.length > 0 && (
-                  <Box display="flex" flexWrap="wrap" mt={1} gap={0.5}>
-                    {pipelines[index].tags.map((tag, tagIndex) => (
-                      <Chip
-                        key={tagIndex}
-                        label={tag}
+              <Card 
+                sx={{ 
+                  height: '100%',
+                  width: '100%',
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  cursor: 'pointer'
+                }}
+                onClick={() => handlePipelineClick(pipelines[index].uuid)}
+              >
+                <CardContent sx={{ flexGrow: 1, width: '100%', textAlign: 'left' }}>
+                  <Typography variant="h6" component="div" gutterBottom noWrap>
+                    {pipelines[index].name}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary"
+                    sx={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      height: '3em',
+                    }}
+                  >
+                    {pipelines[index].description || 'No description available'}
+                  </Typography>
+                  {pipelines[index].status && (
+                    <Box display="flex" justifyContent="center" mt={1}>
+                      <Chip 
+                        label={pipelines[index].status} 
+                        color={pipelines[index].status === 'active' ? 'success' : 'default'}
                         size="small"
-                        color="primary"
-                        variant="outlined"
                       />
-                    ))}
-                  </Box>
-                )}
-              </CardActions>
-            </Card>
-          </AnimatedGrid>
-        ))}
-      </Grid>
-      <Modal
-        open={openModal}
-        onClose={handleCloseModal}
-        aria-labelledby="pipeline-detail-modal"
-        aria-describedby="pipeline-detail-description"
-      >
-        <Paper sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 400,
-          bgcolor: 'background.paper',
-          boxShadow: 24,
-          p: 4,
-        }}>
-          <Typography id="pipeline-detail-modal" variant="h6" component="h2">
-            {selectedPipeline?.name}
-          </Typography>
-          <Typography id="pipeline-detail-description" sx={{ mt: 2 }}>
-            {selectedPipeline?.description || 'No description available'}
-          </Typography>
-          <Typography sx={{ mt: 2 }}>
-            Status: {selectedPipeline?.status || 'Unknown'}
-          </Typography>
-          <Button onClick={handleCloseModal} sx={{ mt: 2 }}>
-            Close
-          </Button>
-        </Paper>
-      </Modal>
-    </Box>
+                    </Box>
+                  )}
+                </CardContent>
+                <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
+                  {/* <Button size="small" variant="contained" startIcon={<PlayArrowIcon />}>
+                    Run
+                  </Button> */}
+                  {pipelines[index].tags && pipelines[index].tags.length > 0 && (
+                    <Box display="flex" flexWrap="wrap" mt={1} gap={0.5}>
+                      {pipelines[index].tags.map((tag, tagIndex) => (
+                        <Chip
+                          key={tagIndex}
+                          label={tag}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </CardActions>
+              </Card>
+            </AnimatedGrid>
+          ))}
+        </Grid>
+        <Modal
+          open={openModal}
+          onClose={handleCloseModal}
+          aria-labelledby="pipeline-detail-modal"
+          aria-describedby="pipeline-detail-description"
+        >
+          <Paper sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+          }}>
+            <Typography id="pipeline-detail-modal" variant="h6" component="h2">
+              {selectedPipeline?.name}
+            </Typography>
+            <Typography id="pipeline-detail-description" sx={{ mt: 2 }}>
+              {selectedPipeline?.description || 'No description available'}
+            </Typography>
+            <Typography sx={{ mt: 2 }}>
+              Status: {selectedPipeline?.status || 'Unknown'}
+            </Typography>
+            <Button onClick={handleCloseModal} sx={{ mt: 2 }}>
+              Close
+            </Button>
+          </Paper>
+        </Modal>
+      </Box>
+    </>
   );
 };
 
