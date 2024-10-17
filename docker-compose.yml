@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  pipeline-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - VITE_API_KEY=${VITE_API_KEY}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
