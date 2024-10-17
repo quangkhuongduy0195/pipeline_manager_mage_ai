@@ -25,6 +25,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { fetchPipelineSchedules } from '../services/api';
 import { defineCron, formatDate } from '../utils/dateUtils';
 import { useTrail, animated } from 'react-spring';
+import AddIcon from '@mui/icons-material/Add';
 
 interface PipelineSchedule {
   id: string;
@@ -95,6 +96,10 @@ const PipelineSchedules: React.FC = () => {
     navigate(`/pipelines/${id}/runs/${encodeURIComponent(name)}/${token}/${status}`);
   };
 
+  const handleCreateTrigger = () => {
+    navigate(`/pipelines/${id}/schedules/create`);
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100%">
@@ -120,22 +125,35 @@ const PipelineSchedules: React.FC = () => {
       p: 3
     }}>
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={handleBack}
+            sx={{ color: 'white', fontWeight: 'bold' }}
           >
-            Back to Pipelines
+            Pipelines
           </Button>
           <Typography 
-            variant="h6" 
-            component="h1" 
+            component="h1"
             sx={{ 
-              color: theme.palette.primary.main,
+              display: { xs: 'none', sm: 'block' },
+              flexGrow: 1,
+              color: 'white',
+              fontWeight: 'bold'
             }}
           >
             / {decodeURIComponent(id || '')}
           </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon sx={{ 
+              display: { xs: 'none', sm: 'block' },
+            }} />}
+            onClick={handleCreateTrigger}
+          >
+            Create Trigger
+          </Button>
         </Box>
       </Box>
       

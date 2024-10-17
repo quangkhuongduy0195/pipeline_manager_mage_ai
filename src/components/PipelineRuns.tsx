@@ -172,14 +172,16 @@ const PipelineRuns: React.FC = () => {
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={handleBack}
+            sx={{ color: 'white', fontWeight: 'bold' }}
           >
             Pipeline Schedules
           </Button>
-          <Typography variant="h6" 
+          <Typography
             component="h1" 
             sx={{ 
               display: { xs: 'none', sm: 'block' },
-              color: theme.palette.primary.main,
+              color: 'white',
+              fontWeight: 'bold'
             }}>
             / {decodeURIComponent(name || '')}
           </Typography>

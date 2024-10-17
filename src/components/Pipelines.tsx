@@ -22,6 +22,7 @@ interface Pipeline {
   name: string;
   description?: string;
   status?: string;
+  tags?: string[] | null;
 }
 
 const AnimatedGrid = animated(Grid);
@@ -83,7 +84,7 @@ const Pipelines: React.FC = () => {
 
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ color: '#1976d2' }}>
+      <Typography variant="h4" gutterBottom sx={{ color: 'white', fontWeight: 'bold' }}>
         Pipelines
       </Typography>
       <Grid container spacing={3} justifyContent="start" alignItems="center">
@@ -137,9 +138,22 @@ const Pipelines: React.FC = () => {
                 )}
               </CardContent>
               <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
-                <Button size="small" variant="contained" startIcon={<PlayArrowIcon />}>
+                {/* <Button size="small" variant="contained" startIcon={<PlayArrowIcon />}>
                   Run
-                </Button>
+                </Button> */}
+                {pipelines[index].tags && pipelines[index].tags.length > 0 && (
+                  <Box display="flex" flexWrap="wrap" mt={1} gap={0.5}>
+                    {pipelines[index].tags.map((tag, tagIndex) => (
+                      <Chip
+                        key={tagIndex}
+                        label={tag}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    ))}
+                  </Box>
+                )}
               </CardActions>
             </Card>
           </AnimatedGrid>

@@ -6,6 +6,7 @@ import Pipelines from './components/Pipelines';
 import PipelineRuns from './components/PipelineRuns';
 import PipelineSchedules from './components/PipelineSchedules';
 import Blocks from './components/Blocks';
+import CreateEditTrigger from './components/CreateEditTrigger';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
             <Route index element={<Navigate to="/pipelines" replace />} />
             <Route path="pipelines" element={<Pipelines />} />
             <Route path="pipelines/:id/schedules" element={<PipelineSchedules />} />
+            <Route path="pipelines/:id/schedules/create" element={<CreateEditTrigger />} />
             <Route path="pipelines/:scheduleId/runs/:name/:token/:status" element={<PipelineRuns />} />
             <Route path="pipelines/blocks" element={<Blocks />} />
           </Route>
