@@ -1,63 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { TextField, Button, Box, Typography, Container, CssBaseline, CircularProgress, Paper, IconButton, InputAdornment } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Form, Input, Button, Card, message, Typography, Layout, Space } from 'antd';
+import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { login } from './services/api';
-import bgImage from './assets/bg.png';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import { saveToken } from './services/tokenManager';
-import { isTokenValid } from './services/tokenManager';
+import { saveToken, isTokenValid, saveUserInfo } from './services/tokenManager';
+import { motion } from 'framer-motion';
+import { useUser } from './contexts/UserContext';
 
-type LoginInputs = {
-  email: string;
-  password: string;
-};
-
-type ErrorResponse = {
-  error: {
-    code: number;
-    message: string;
-    type: string;
-  };
-};
-
-type SuccessResponse = {
-  session: {
-    expires: string;
-    token: string;
-    user: {
-      id: number;
-      username: string;
-      // ... other user properties
-    };
-  };
-};
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-});
+const { Title, Text } = Typography;
+const { Content } = Layout;
 
 const Login: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginInputs>();
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  const handleClickShowPassword = () => setShowPassword(!showPassword);
-  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  };
+  const { setUserInfo } = useUser();
 
   useEffect(() => {
     if (isTokenValid()) {
@@ -65,123 +21,91 @@ const Login: React.FC = () => {
     }
   }, [navigate]);
 
-  const onSubmit: SubmitHandler<LoginInputs> = async (data) => {
-    setIsLoading(true);
+  const onFinish = async (values: { email: string; password: string }) => {
+    setLoading(true);
     try {
-      const response = await login(data.email, data.password);
-      
-      if ('error' in response) {
-        const errorResponse = response as ErrorResponse;
-        toast.error(errorResponse.error.message);
+      const response = await login(values.email, values.password);
+      if (response.session && response.session.token && response.session.expires) {
+        saveToken(response.session.token, response.session.expires);
+        saveUserInfo(response.session.user);
+        setUserInfo(response.session.user);
+        message.success('Đăng nhập thành công!');
+        navigate('/pipelines');
       } else {
-        const successResponse = response as SuccessResponse;
-        console.log('Đăng nhập thành công:', successResponse);
-        toast.success('Đăng nhập thành công!');
-        
-        // Sử dụng saveToken để lưu token và thời gian hết hạn
-        saveToken(successResponse.session.token, successResponse.session.expires);
-        
-        setTimeout(() => {
-          navigate('/pipelines');
-        }, 1500);
+        throw new Error('Invalid response from server');
       }
     } catch (error) {
-      console.error('Lỗi đăng nhập:', error);
-      toast.error('Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
+      message.error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box
-        sx={{
-          height: '100vh',
-          width: '100vw',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundImage: `url(${bgImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <Container component="main" maxWidth="xs">
-          <Paper
-            elevation={6}
-            sx={{
-              padding: 4,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    <Layout style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)' }}>
+      <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card 
+            style={{ 
+              width: 400, 
+              boxShadow: '0 4px 8px rgba(0,0,0,0.1)', 
+              borderRadius: '15px',
+              background: 'rgba(255, 255, 255, 0.9)',
             }}
           >
-            <Typography component="h1" variant="h4" sx={{ mb: 3, fontWeight: 'bold', color: 'primary.main' }}>
-              Đăng nhập
-            </Typography>
-            <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1, width: '100%' }}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                id="email"
-                label="Địa chỉ email"
-                autoComplete="email"
-                autoFocus
-                {...register('email', { 
-                  required: 'Email là bắt buộc', 
-                  pattern: { value: /^\S+@\S+$/i, message: 'Email không hợp lệ' } 
-                })}
-                error={!!errors.email}
-                helperText={errors.email?.message}
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Mật khẩu"
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                autoComplete="current-password"
-                {...register('password', { 
-                  required: 'Mật khẩu là bắt buộc', 
-                  minLength: { value: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' } 
-                })}
-                error={!!errors.password}
-                helperText={errors.password?.message}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={handleClickShowPassword}
-                        onMouseDown={handleMouseDownPassword}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                sx={{ mt: 3, mb: 2, py: 1.5 }}
-                disabled={isLoading}
+            <Space direction="vertical" size="large" style={{ width: '100%', textAlign: 'center' }}>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
               >
-                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Đăng nhập'}
-              </Button>
-            </Box>
-          </Paper>
-        </Container>
-      </Box>
-      <ToastContainer position="top-right" autoClose={3000} />
-    </ThemeProvider>
+                <LoginOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
+              </motion.div>
+              <Title level={2} style={{ marginBottom: 0 }}>Đăng nhập</Title>
+              <Text type="secondary">Chào mừng bạn đến với hệ thống quản lý Pipeline</Text>
+              <Form
+                name="normal_login"
+                initialValues={{ remember: true }}
+                onFinish={onFinish}
+                style={{ textAlign: 'left' }}
+              >
+                <Form.Item
+                  name="email"
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập email!' },
+                    { type: 'email', message: 'Email không hợp lệ!' }
+                  ]}
+                >
+                  <Input prefix={<UserOutlined />} placeholder="Email" size="large" />
+                </Form.Item>
+                <Form.Item
+                  name="password"
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập mật khẩu!' },
+                    { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự!' }
+                  ]}
+                >
+                  <Input.Password
+                    prefix={<LockOutlined />}
+                    placeholder="Mật khẩu"
+                    size="large"
+                  />
+                </Form.Item>
+                <Form.Item>
+                  <Button type="primary" htmlType="submit" style={{ width: '100%' }} loading={loading} size="large">
+                    Đăng nhập
+                  </Button>
+                </Form.Item>
+              </Form>
+            </Space>
+          </Card>
+        </motion.div>
+      </Content>
+    </Layout>
   );
 };
 

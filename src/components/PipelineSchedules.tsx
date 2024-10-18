@@ -2,30 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
   Button, 
-  Box, 
-  CircularProgress, 
-  Paper, 
   Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow,
-  Chip,
-  IconButton,
-  useTheme,
-  useMediaQuery,
-  alpha,
-  tableCellClasses
-} from '@mui/material';
+  Tag, 
+  Space, 
+  Card,
+  List,
+  Row,
+  Col,
+  Input,
+  Statistic,
+  Skeleton,
+  message,
+  Modal,
+} from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { fetchPipelineSchedules } from '../services/api';
+import { EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { fetchPipelineSchedules, deletePipelineSchedule, fetchPipeline } from '../services/api';
 import { defineCron, formatDate } from '../utils/dateUtils';
-import { useTrail, animated } from 'react-spring';
-import AddIcon from '@mui/icons-material/Add';
+import { useHeader } from '../contexts/HeaderContext';
+import { useMediaQuery } from 'react-responsive';
+import { motion } from 'framer-motion';
+
+const { Title, Text, Paragraph } = Typography;
+
+const { confirm } = Modal;
 
 interface PipelineSchedule {
   id: string;
@@ -34,231 +34,283 @@ interface PipelineSchedule {
   status: 'active' | 'inactive';
   next_pipeline_run_date: string | null;
   last_enabled_at: string | null;
-  last_pipeline_run_status: 'success' | 'failed' | 'running' | null;
+  last_pipeline_run_status: 'completed' | 'failed' | 'running' | null;
   token: string;
 }
 
-const AnimatedTableRow = animated(TableRow);
+interface Pipeline {
+  uuid: string;
+  name: string;
+}
 
 const PipelineSchedules: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [schedules, setSchedules] = useState<PipelineSchedule[]>([]);
+  const [filteredSchedules, setFilteredSchedules] = useState<PipelineSchedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const theme = useTheme();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const [searchTerm, setSearchTerm] = useState('');
+  const { setTitle, setShowBackButton } = useHeader();
+  const isMobile = useMediaQuery({ maxWidth: 767 });
+  const [pipeline, setPipeline] = useState<Pipeline | null>(null);
 
   useEffect(() => {
-    const loadSchedules = async () => {
+    setShowBackButton(true);
+    const loadData = async () => {
       if (!id) return;
       try {
-        const data = await fetchPipelineSchedules(id);
-        setSchedules(data.pipeline_schedules);
+        const [schedulesData, pipelineData] = await Promise.all([
+          fetchPipelineSchedules(id),
+          fetchPipeline(id)
+        ]);
+        setSchedules(schedulesData.pipeline_schedules);
+        setFilteredSchedules(schedulesData.pipeline_schedules);
+        setPipeline(pipelineData);
+        setTitle(`Schedules: ${pipelineData.name}`);
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching pipeline schedules:', err);
-        setError('Failed to load pipeline schedules. Please try again later.');
+        message.error('Failed to load data. Please try again.');
         setLoading(false);
       }
     };
 
-    loadSchedules();
-  }, [id]);
+    loadData();
+  }, [id, setTitle, setShowBackButton]);
 
-  const handleBack = () => {
-    navigate(-1);
-  };
+  useEffect(() => {
+    const filtered = schedules.filter(schedule => 
+      schedule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.schedule_interval?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredSchedules(filtered);
+  }, [searchTerm, schedules]);
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'completed':
-        return 'success';
-      case 'failed':
-        return 'error';
-      case 'running':
-        return 'info';
-      default:
-        return 'warning';
-    }
-  };
-
-  const trail = useTrail(schedules.length, {
-    from: { opacity: 0, transform: 'scale(0.9)' },
-    to: { opacity: 1, transform: 'scale(1)' },
-    config: {
-      tension: 1000,
-      friction: 50
-    },
-  });
-
-  const handleRowClick = (id: string, name: string, token: string, status: string) => {
-    navigate(`/pipelines/${id}/runs/${encodeURIComponent(name)}/${token}/${status}`);
+  const handleRowClick = (scheduleId: string, name: string, token: string, status: string) => {
+    navigate(`/pipelines/${id}/runs/${scheduleId}/${encodeURIComponent(name)}/${token}/${status}`);
   };
 
   const handleCreateTrigger = () => {
     navigate(`/pipelines/${id}/schedules/create`);
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const handleEditTrigger = (e: React.MouseEvent, scheduleId: string) => {
+    e.stopPropagation(); // Prevent row click event
+    navigate(`/pipelines/${id}/schedules/edit/${scheduleId}`);
+  };
 
-  if (error) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
+  const handleDeleteSchedule = (e: React.MouseEvent, scheduleId: string) => {
+    e.stopPropagation();
+    confirm({
+      title: 'Are you sure you want to delete this schedule?',
+      icon: <ExclamationCircleOutlined />,
+      content: 'This action cannot be undone.',
+      okText: 'Yes',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk: async () => {
+        try {
+          await deletePipelineSchedule(scheduleId);
+          message.success('Schedule deleted successfully');
+          // Refresh the schedules list
+          const updatedSchedules = schedules.filter(schedule => schedule.id !== scheduleId);
+          setSchedules(updatedSchedules);
+          setFilteredSchedules(updatedSchedules);
+        } catch (error) {
+          message.error('Failed to delete schedule. Please try again.');
+        }
+      },
+    });
+  };
+
+  const columns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Cron',
+      dataIndex: 'schedule_interval',
+      key: 'schedule_interval',
+      render: (text: string | null) => (
+        <Space direction="vertical">
+          <span>{text || 'N/A'}</span>
+          <span>{text ? defineCron(text) : 'N/A'}</span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <Tag color={status === 'active' ? 'green' : 'blue'}>{status}</Tag>
+      ),
+    },
+    {
+      title: 'Next Run',
+      dataIndex: 'next_pipeline_run_date',
+      key: 'next_pipeline_run_date',
+      render: (date: string | null) => date ? formatDate(date) : 'N/A',
+    },
+    {
+      title: 'Last Run',
+      key: 'last_run',
+      render: (_: any, record: PipelineSchedule) => (
+        <Space>
+          <span>{record.last_enabled_at ? formatDate(record.last_enabled_at) : 'N/A'}</span>
+          {record.last_pipeline_run_status && (
+            <Tag color={record.last_pipeline_run_status === 'completed' ? 'green' : 'red'}>
+              {record.last_pipeline_run_status}
+            </Tag>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: PipelineSchedule) => (
+        <Space size="middle">
+          <Button 
+            icon={<EditOutlined />} 
+            onClick={(e) => handleEditTrigger(e, record.id)}
+          >
+          </Button>
+          <Button 
+            icon={<DeleteOutlined />} 
+            danger
+            onClick={(e) => handleDeleteSchedule(e, record.id)}
+          >
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
+  const renderSkeletons = () => {
+    return Array(5).fill(null).map((_, index) => (
+      <Card key={index} style={{ marginBottom: 16 }}>
+        <Skeleton active avatar paragraph={{ rows: 3 }} />
+      </Card>
+    ));
+  };
 
   return (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      overflow: isSmallScreen ? 'auto' : 'hidden',
-      p: 3
-    }}>
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            sx={{ color: 'white', fontWeight: 'bold' }}
-          >
-            Pipelines
-          </Button>
-          <Typography 
-            component="h1"
-            sx={{ 
-              display: { xs: 'none', sm: 'block' },
-              flexGrow: 1,
-              color: 'white',
-              fontWeight: 'bold'
-            }}
-          >
-            / {decodeURIComponent(id || '')}
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon sx={{ 
-              display: { xs: 'none', sm: 'block' },
-            }} />}
-            onClick={handleCreateTrigger}
-          >
-            Create Trigger
-          </Button>
-        </Box>
-      </Box>
-      
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto', 
-          boxShadow: 3,
-          backgroundColor: alpha(theme.palette.background.paper, 0.01),
-          backdropFilter: 'blur(1px)'
-        }}
-      >
-        <Table stickyHeader sx={{
-          [`& .${tableCellClasses.root}`]: {
-            borderBottom: "0.5px solid #1976d2",
-          }
-        }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Name</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Cron</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Next Run</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Last Run</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {trail.map((style, index) => (
-              <AnimatedTableRow 
-                key={schedules[index].id}
-                onClick={() => handleRowClick(schedules[index].id, schedules[index].name, schedules[index].token, schedules[index].status)}
-                sx={{ 
-                  cursor: 'pointer',
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                  },
-                }}
-                style={style}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Space direction="vertical" size="middle" style={{ display: 'flex', width: '100%' }}>
+        <Card>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={8}>
+              <Statistic 
+                title="Total Schedules" 
+                value={schedules.length} 
+                prefix={<ClockCircleOutlined />} 
+              />
+            </Col>
+            <Col xs={24} md={8}>
+              <Statistic 
+                title="Active Schedules" 
+                value={schedules.filter(schedule => schedule.status === 'active').length}
+                valueStyle={{ color: '#3f8600' }}
+                prefix={<CheckCircleOutlined />}
+              />
+            </Col>
+            <Col xs={24} md={8}>
+              <Statistic 
+                title="Inactive Schedules" 
+                value={schedules.filter(schedule => schedule.status === 'inactive').length}
+                valueStyle={{ color: '#cf1322' }}
+                prefix={<CloseCircleOutlined />}
+              />
+            </Col>
+          </Row>
+        </Card>
+        <Card>
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={24} sm={12}>
+              <Input
+                placeholder="Search schedules"
+                prefix={<SearchOutlined />}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </Col>
+            <Col xs={24} sm={12} style={{ textAlign: 'right' }}>
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />} 
+                onClick={handleCreateTrigger}
               >
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>{schedules[index].name}</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <Typography variant="body2" fontWeight="bold">
-                    {schedules[index].schedule_interval || 'N/A'}
-                  </Typography>
-                  <Typography variant="caption">
-                    {schedules[index].schedule_interval ? defineCron(schedules[index].schedule_interval) : 'N/A'}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <Chip
-                    label={schedules[index].status} 
-                    color={schedules[index].status === 'active' ? 'success' : 'info'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>{schedules[index].next_pipeline_run_date ? formatDate(schedules[index].next_pipeline_run_date) : 'N/A'}</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>
-                  {schedules[index].last_enabled_at ? formatDate(schedules[index].last_enabled_at) : 'N/A'}
-                  <Chip 
-                    label={schedules[index].last_pipeline_run_status || 'N/A'} 
-                    color={getStatusColor(schedules[index].last_pipeline_run_status)}
-                    size="small"
-                    sx={{ ml: 1 }}
-                  />
-                </TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <IconButton 
-                    size="small" 
-                    color="primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Handle edit action
-                    }}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton 
-                    size="small" 
-                    color="error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Handle delete action
-                    }}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </AnimatedTableRow>
-            ))}
-            
-            {schedules.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7}>
-                  <Typography sx={{ mt: 4, color: 'white', textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                    No schedules found for this pipeline.
-                  </Typography>
-                </TableCell>
-              </TableRow>
+                Create Trigger
+              </Button>
+            </Col>
+          </Row>
+        </Card>
+        {loading ? (
+          renderSkeletons()
+        ) : isMobile ? (
+          <List
+            dataSource={filteredSchedules}
+            renderItem={(item: PipelineSchedule) => (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card 
+                  style={{ marginBottom: 16 }}
+                  onClick={() => handleRowClick(item.id, item.name, item.token, item.status)}
+                  hoverable
+                >
+                  <Title level={5}>{item.name}</Title>
+                  <Paragraph>
+                    <Text strong>Cron:</Text> {item.schedule_interval || 'N/A'}
+                    <br />
+                    {item.schedule_interval && (
+                      <Text type="secondary">{defineCron(item.schedule_interval)}</Text>
+                    )}
+                  </Paragraph>
+                  <Tag color={item.status === 'active' ? 'green' : 'blue'}>{item.status}</Tag>
+                  <Paragraph>
+                    <Text strong>Next Run:</Text> {item.next_pipeline_run_date ? formatDate(item.next_pipeline_run_date) : 'N/A'}
+                  </Paragraph>
+                  <Paragraph>
+                    <Text strong>Last Run:</Text> {item.last_enabled_at ? formatDate(item.last_enabled_at) : 'N/A'}
+                    {item.last_pipeline_run_status && (
+                      <Tag color={item.last_pipeline_run_status === 'completed' ? 'green' : 'red'} style={{ marginLeft: 8 }}>
+                        {item.last_pipeline_run_status}
+                      </Tag>
+                    )}
+                  </Paragraph>
+                  <Space style={{ marginTop: 8 }}>
+                    <Button icon={<EditOutlined />} onClick={(e) => handleEditTrigger(e, item.id)}>
+                      Edit
+                    </Button>
+                    <Button icon={<DeleteOutlined />} danger onClick={(e) => handleDeleteSchedule(e, item.id)}>
+                      Delete
+                    </Button>
+                  </Space>
+                </Card>
+              </motion.div>
             )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
+          />
+        ) : (
+          <Table 
+            columns={columns} 
+            dataSource={filteredSchedules} 
+            rowKey="id"
+            onRow={(record) => ({
+              onClick: () => handleRowClick(record.id, record.name, record.token, record.status),
+            })}
+            scroll={{ x: 'max-content' }}
+          />
+        )}
+      </Space>
+    </motion.div>
   );
 };
 

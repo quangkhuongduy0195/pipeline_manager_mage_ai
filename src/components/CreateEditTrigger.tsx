@@ -1,470 +1,424 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Box, 
   Typography, 
-  TextField, 
+  Button, 
+  Form, 
+  Input, 
   Select, 
-  MenuItem, 
-  FormControl, 
-  Button,
-  Card,
-  CardContent,
-  useTheme,
-  alpha,
-  Switch,
-  Checkbox,
-  FormControlLabel,
-  IconButton,
-  Divider,
-  useMediaQuery,
-  Fade
-} from '@mui/material';
-import Grid from '@mui/material/Grid2';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs, { Dayjs } from 'dayjs';
-import { useNavigate, useParams } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AddIcon from '@mui/icons-material/Add';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import RepeatIcon from '@mui/icons-material/Repeat';
-import TimerIcon from '@mui/icons-material/Timer';
-import CodeIcon from '@mui/icons-material/Code';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { defineCron } from '../utils/dateUtils'; // Thêm import này
+  Switch, 
+  Checkbox, 
+  DatePicker, 
+  Space, 
+  Card, 
+  Divider, 
+  Row, 
+  Col,
+  message,
+  Skeleton,
+  Alert
+} from 'antd';
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { fetchPipelineSchedules, createPipelineSchedule, updatePipelineSchedule, fetchPipelineVariables } from '../services/api';
+import { defineCron } from '../utils/dateUtils';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import { useHeader } from '../contexts/HeaderContext';
+import { motion, AnimatePresence } from 'framer-motion';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const { Title } = Typography;
+const { TextArea } = Input;
+const { Option } = Select;
+
+interface RuntimeVariable {
+  uuid: string;
+  value: string;
+}
+
+interface PipelineVariable {
+  uuid: string;
+  type: string;
+  value: string;
+}
+
+interface VariableGroup {
+  block: {
+    uuid: string;
+  };
+  pipeline: {
+    uuid: string;
+  };
+  variables: PipelineVariable[];
+}
+
+const isCronExpression = (value: string) => {
+  // Simple regex to check if the value looks like a cron expression
+  const cronRegex = /^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|\*\/([1-9]|1[0-9]|2[0-9]|3[0-1])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/;
+  return cronRegex.test(value);
+};
 
 const CreateEditTrigger: React.FC = () => {
-  const theme = useTheme();
+  const [form] = Form.useForm();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
-
-  // Khai báo các state
-  const [triggerName, setTriggerName] = useState('');
-  const [triggerDescription, setTriggerDescription] = useState('');
+  const { id: pipelineId, scheduleId } = useParams<{ id?: string; scheduleId?: string }>();
+  const [loading, setLoading] = useState(true);
   const [frequency, setFrequency] = useState('');
-  const [startDateTime, setStartDateTime] = useState<Dayjs | null>(dayjs());
-  const [timeout, setTimeout] = useState('');
-  const [timeoutStatus, setTimeoutStatus] = useState('failed');
   const [configureSLA, setConfigureSLA] = useState(false);
-  const [slaTime, setSlaTime] = useState('');
-  const [slaTimeUnit, setSlaTimeUnit] = useState('minutes');
-  const [keepRunning, setKeepRunning] = useState(false);
-  const [skipRun, setSkipRun] = useState(false);
-  const [createInitialRun, setCreateInitialRun] = useState(false);
-  const [runtimeVariables, setRuntimeVariables] = useState<{ uuid: string; value: string }[]>([]);
-  const [newVariableUUID, setNewVariableUUID] = useState('');
-  const [newVariableValue, setNewVariableValue] = useState('');
-  const [customCron, setCustomCron] = useState('');
-  const [cronDefinition, setCronDefinition] = useState<string>('');
+  const [runtimeVariables, setRuntimeVariables] = useState<RuntimeVariable[]>([]);
+  const { setTitle, setShowBackButton } = useHeader();
+  const [cronDefinition, setCronDefinition] = useState('');
+  const [isCronValid, setIsCronValid] = useState(true);
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    // Xử lý logic gửi dữ liệu đến server
-    console.log({ 
-      triggerName, 
-      triggerDescription, 
-      frequency: frequency === 'custom' ? customCron : frequency, 
-      startDateTime: startDateTime?.toDate(),
-      timeout,
-      timeoutStatus,
-      configureSLA,
-      slaTime,
-      slaTimeUnit,
-      keepRunning,
-      skipRun,
-      createInitialRun,
-      runtimeVariables
-    });
-    // Sau khi xử lý xong, chuyển về trang PipelineSchedules
-    navigate(`/pipelines/${id}/schedules`);
-  };
+  useEffect(() => {
+    setTitle(scheduleId ? 'Edit Trigger' : 'Create Trigger');
+    setShowBackButton(true);
+    const loadData = async () => {
+      if (pipelineId) {
+        try {
+          const [scheduleData, variablesData] = await Promise.all([
+            scheduleId ? fetchPipelineSchedules(pipelineId) : Promise.resolve(null),
+            fetchPipelineVariables(pipelineId)
+          ]);
 
-  const handleBack = () => {
-    navigate(-1);
-  };
+          if (scheduleData) {
+            const schedule = scheduleData.pipeline_schedules.find((s: any) => s.id === parseInt(scheduleId!));
+            if (schedule) {
+              const scheduleInterval = schedule.schedule_interval;
+              const isCustomCron = isCronExpression(scheduleInterval);
+              form.setFieldsValue({
+                triggerName: schedule.name,
+                triggerDescription: schedule.description,
+                frequency: isCustomCron ? 'custom' : scheduleInterval,
+                customCron: isCustomCron ? scheduleInterval : undefined,
+                startDateTime: dayjs.utc(schedule.start_time).local(),
+                timeout: schedule.timeout,
+                timeoutStatus: schedule.timeout_status,
+                slaTime: schedule.sla_time,
+                slaTimeUnit: schedule.sla_time_unit,
+                keepRunning: schedule.keep_running,
+                skipRun: schedule.skip_run,
+                createInitialRun: schedule.create_initial_run,
+              });
+              setFrequency(isCustomCron ? 'custom' : scheduleInterval);
+              setConfigureSLA(!!schedule.sla_time);
+              setRuntimeVariables(schedule.runtime_variables || []);
+            }
+          }
 
-  const addRuntimeVariable = () => {
-    if (newVariableUUID && newVariableValue) {
-      setRuntimeVariables([...runtimeVariables, { uuid: newVariableUUID, value: newVariableValue }]);
-      setNewVariableUUID('');
-      setNewVariableValue('');
+          // Xử lý dữ liệu variables
+          if (variablesData && variablesData.variables) {
+            const relevantVariableGroup = variablesData.variables.find(
+              (group: VariableGroup) => group.pipeline.uuid === pipelineId && group.block.uuid === "global"
+            );
+            if (relevantVariableGroup) {
+              // Khởi tạo runtime variables từ pipeline variables
+              setRuntimeVariables(relevantVariableGroup.variables.map((v:any) => ({ uuid: v.uuid, value: v.value || '' })));
+            }
+          }
+        } catch (err) {
+          message.error('Failed to load data. Please try again.');
+        }
+      }
+      setLoading(false);
+    };
+
+    loadData();
+  }, [pipelineId, scheduleId, form, setTitle, setShowBackButton]);
+
+  const onFinish = async (values: any) => {
+    try {
+      const scheduleData = {
+        name: values.triggerName,
+        start_time: values.startDateTime.utc().format(),
+        description: values.triggerDescription, 
+        schedule_type: 'time',
+        schedule_interval: values.frequency === 'custom' ? values.customCron : values.frequency,
+        sla: values.slaTimeUnit === 'seconds' ? values.slaTime :
+            values.slaTimeUnit === 'minutes' ? values.slaTime * 60 :
+            values.slaTimeUnit === 'hours' ? values.slaTime * 3600 :
+            values.slaTimeUnit === 'days' ? values.slaTime * 86400 :
+            values.slaTime,
+        settings: {
+          timeout: values.timeout,
+          timeout_status: values.timeoutStatus,
+          allow_blocks_to_fail: values.keepRunning,
+          skip_if_previous_running: values.skipRun,
+          create_initial_pipeline_run: values.createInitialRun, 
+        },
+        variables: runtimeVariables,
+      };
+
+      if (scheduleId) {
+        await updatePipelineSchedule(scheduleId, scheduleData);
+        message.success('Trigger updated successfully');
+      } else {
+        if (!pipelineId) {
+          throw new Error('Pipeline ID is missing');
+        }
+        const newScheduleId = await createPipelineSchedule(pipelineId, scheduleData.name);
+        if (newScheduleId) {
+          await updatePipelineSchedule(newScheduleId, scheduleData);
+          message.success('Trigger created successfully');
+        } else {
+          message.error('Failed to create trigger. Please try again.');
+        }
+      }
+      navigate(-1);
+    } catch (error) {
+      console.error('Error saving trigger:', error);
+      message.error('Failed to save trigger. Please try again.');
     }
+  };
+
+  const updateRuntimeVariable = (index: number, field: 'uuid' | 'value', value: string) => {
+    const updatedVariables = [...runtimeVariables];
+    updatedVariables[index][field] = value;
+    setRuntimeVariables(updatedVariables);
   };
 
   const removeRuntimeVariable = (index: number) => {
-    setRuntimeVariables(runtimeVariables.filter((_, i) => i !== index));
+    const updatedVariables = runtimeVariables.filter((_, i) => i !== index);
+    setRuntimeVariables(updatedVariables);
   };
 
-  const textFieldStyle = {
-    input: { color: 'white' },
-    textarea: { color: 'white' },
-    '& .MuiOutlinedInput-root': {
-      '& fieldset': {
-        borderColor: 'white',
-      },
-      '&:hover fieldset': {
-        borderColor: 'white',
-      },
-      '&.Mui-focused fieldset': {
-        borderColor: 'white',
-      },
-    },
+  const addRuntimeVariable = () => {
+    setRuntimeVariables([...runtimeVariables, { uuid: '', value: '' }]);
   };
 
-  const checkboxStyle = {
-    color: 'white',
-    '&.Mui-checked': {
-      color: 'white',
-    },
-    '& .MuiSvgIcon-root': {
-      fontSize: 28,
-    },
-    '& .MuiCheckbox-root': {
-      padding: '4px',
-    },
+  const handleCronExpressionChange = (value: string) => {
+    setCronDefinition(defineCron(value));
+    setIsCronValid(true);
   };
 
-  const selectStyle = {
-    color: 'white', 
-    '.MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-    '& .MuiSvgIcon-root': { color: 'white' }, // Thay đổi màu icon dropdown
-  };
-
-  const dateTimePickerStyle = { 
-    width: '100%', 
-    '& .MuiInputBase-root': { color: 'white' },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-    '& .MuiIconButton-root': { color: 'white' }, // Thay đổi màu icon calendar
-    '& .MuiSvgIcon-root': { color: 'white' }, // Thay đổi màu các icon khác (nếu có)
-  };
-
-  useEffect(() => {
-    if (customCron) {
-      const definition = defineCron(customCron);
-      setCronDefinition(definition || 'Enter a valid cron expression (e.g., "0 0 * * *" for daily at midnight)');
-    } else {
-      setCronDefinition('');
-    }
-  }, [customCron]);
-
-  const renderTriggerSettings = () => (
-    <Fade in={true} timeout={1000}>
-      <Card 
-        elevation={3}
-        sx={{ 
-          height: '100%',
-          background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.1)} 30%, ${alpha(theme.palette.secondary.main, 0.1)} 90%)`,
-          backdropFilter: 'blur(10px)',
-        }}
-      >
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 3, color: 'white', fontWeight: 'bold' }}>
-            <AccessTimeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Trigger Settings
-          </Typography>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Trigger Name</Typography>
-            <TextField
-              fullWidth
-              value={triggerName}
-              onChange={(e) => setTriggerName(e.target.value)}
-              required
-              sx={textFieldStyle}
-            />
-          </Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Trigger Description</Typography>
-            <TextField
-              fullWidth
-              value={triggerDescription}
-              onChange={(e) => setTriggerDescription(e.target.value)}
-              multiline
-              rows={3}
-              sx={textFieldStyle}
-            />
-          </Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>
-              <RepeatIcon sx={{ mr: 1, verticalAlign: 'middle' }} /> Frequency
-            </Typography>
-            <FormControl fullWidth>
-              <Select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value as string)}
-                required
-                sx={selectStyle}
-              >
-                <MenuItem value="once">Once</MenuItem>
-                <MenuItem value="hourly">Hourly</MenuItem>
-                <MenuItem value="daily">Daily</MenuItem>
-                <MenuItem value="weekly">Weekly</MenuItem>
-                <MenuItem value="monthly">Monthly</MenuItem>
-                <MenuItem value="always_on">Always On</MenuItem>
-                <MenuItem value="custom">Custom</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-          {frequency === 'custom' && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>
-                Cron Expression
-              </Typography>
-              <TextField
-                fullWidth
-                value={customCron}
-                onChange={(e) => setCustomCron(e.target.value)}
-                placeholder="e.g. 0 0 * * *"
-                sx={textFieldStyle}
-              />
-              <Typography variant="caption" sx={{ mt: 1, color: 'white' }}>
-                {cronDefinition}
-              </Typography>
-            </Box>
-          )}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Start Date and Time</Typography>
-            <DateTimePicker
-              value={startDateTime}
-              onChange={(newValue) => setStartDateTime(newValue)}
-              sx={dateTimePickerStyle}
-            />
-          </Box>
-        </CardContent>
-      </Card>
-    </Fade>
+  const renderSkeletons = () => (
+    <Row gutter={24}>
+      <Col span={12}>
+        <Card title="Trigger Settings" style={{ height: '100%' }}>
+          <Skeleton active paragraph={{ rows: 6 }} />
+        </Card>
+      </Col>
+      <Col span={12}>
+        <Card title="Run Settings" style={{ height: '100%' }}>
+          <Skeleton active paragraph={{ rows: 8 }} />
+        </Card>
+      </Col>
+    </Row>
   );
 
-  const renderRunSettings = () => (
-    <Fade in={true} timeout={1000}>
-      <Card 
-        elevation={3}
-        sx={{ 
-          height: '100%',
-          background: `linear-gradient(45deg, ${alpha(theme.palette.secondary.main, 0.1)} 30%, ${alpha(theme.palette.primary.main, 0.1)} 90%)`,
-          backdropFilter: 'blur(10px)',
-        }}
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.5 }}
       >
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 3, color: 'white', fontWeight: 'bold' }}>
-            <TimerIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Run Settings
-          </Typography>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Set a timeout for each run of this trigger (optional)</Typography>
-            <TextField
-              fullWidth
-              value={timeout}
-              onChange={(e) => setTimeout(e.target.value)}
-              sx={textFieldStyle}
-            />
-          </Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Status for runs that exceed the timeout</Typography>
-            <FormControl fullWidth>
-              <Select
-                value={timeoutStatus}
-                onChange={(e) => setTimeoutStatus(e.target.value as string)}
-                sx={selectStyle}
-              >
-                <MenuItem value="failed">Failed</MenuItem>
-                <MenuItem value="timeout">Timeout</MenuItem>
-                <MenuItem value="cancel">Cancel</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-          <FormControlLabel
-            control={<Switch checked={configureSLA} onChange={(e) => setConfigureSLA(e.target.checked)} />}
-            label={<Typography color="white">Configure trigger SLA</Typography>}
-            sx={{ mb: 3 }}
-          />
-          {configureSLA && (
-            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>SLA Time</Typography>
-                <TextField
-                  fullWidth
-                  value={slaTime}
-                  onChange={(e) => setSlaTime(e.target.value)}
-                  sx={textFieldStyle}
-                />
-              </Box>
-              <Box sx={{ minWidth: 120 }}>
-                <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Time Unit</Typography>
-                <FormControl fullWidth>
-                  <Select
-                    value={slaTimeUnit}
-                    onChange={(e) => setSlaTimeUnit(e.target.value as string)}
-                    sx={selectStyle}
-                  >
-                    <MenuItem value="minutes">Minutes</MenuItem>
-                    <MenuItem value="hours">Hours</MenuItem>
-                    <MenuItem value="days">Days</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-            </Box>
-          )}
-          <FormControlLabel
-            control={
-              <Checkbox 
-                checked={keepRunning} 
-                onChange={(e) => setKeepRunning(e.target.checked)}
-                sx={checkboxStyle}
-              />
-            }
-            label="Keep running pipeline even if blocks fail"
-            sx={{ display: 'block', mb: 2, color: 'white' }}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox 
-                checked={skipRun} 
-                onChange={(e) => setSkipRun(e.target.checked)}
-                sx={checkboxStyle}
-              />
-            }
-            label="Skip run if previous run still in progress"
-            sx={{ display: 'block', mb: 2, color: 'white' }}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox 
-                checked={createInitialRun} 
-                onChange={(e) => setCreateInitialRun(e.target.checked)}
-                sx={checkboxStyle}
-              />
-            }
-            label="Create initial pipeline run if start date is before current execution period"
-            sx={{ display: 'block', mb: 3, color: 'white' }}
-          />
-          <Divider sx={{ my: 3, bgcolor: 'white' }} />
-          <Typography variant="subtitle1" sx={{ mb: 3, color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-            <CodeIcon sx={{ mr: 1, color: 'white' }} />
-            Runtime Variables
-          </Typography>
-          {runtimeVariables.map((variable, index) => (
-            <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'flex-end' }}>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Variable UUID</Typography>
-                <TextField
-                  fullWidth
-                  value={variable.uuid}
-                  disabled
-                  sx={{ 
-                    '& .MuiInputBase-input': {
-                      color: 'white',
-                    },
-                    '& .MuiInputBase-input.Mui-disabled': {
-                      WebkitTextFillColor: 'white',
-                    },
-                    textFieldStyle
-                  }}
-                />
-              </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>Value</Typography>
-                <TextField
-                  fullWidth
-                  value={variable.value}
-                  disabled
-                  sx={{ 
-                    '& .MuiInputBase-input': {
-                      color: 'white',
-                    },
-                    '& .MuiInputBase-input.Mui-disabled': {
-                      WebkitTextFillColor: 'white',
-                    },
-                    textFieldStyle
-                  }}
-                />
-              </Box>
-              <IconButton 
-                onClick={() => removeRuntimeVariable(index)}
-                sx={{ color: 'white', mb: 1 }}
-              >
-                <DeleteIcon />
-              </IconButton>
-            </Box>
-          ))}
-          <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'flex-end' }}>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>New Variable UUID</Typography>
-              <TextField
-                fullWidth
-                value={newVariableUUID}
-                onChange={(e) => setNewVariableUUID(e.target.value)}
-                sx={textFieldStyle}
-              />
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="body1" sx={{ mb: 1, color: 'white' }}>New Variable Value</Typography>
-              <TextField
-                fullWidth
-                value={newVariableValue}
-                onChange={(e) => setNewVariableValue(e.target.value)}
-                sx={textFieldStyle}
-              />
-            </Box>
-            <IconButton 
-              onClick={addRuntimeVariable}
-              disabled={!newVariableUUID || !newVariableValue}
-              sx={{ color: 'white', mb: 1 }}
-            >
-              <AddIcon />
-            </IconButton>
-          </Box>
-        </CardContent>
-      </Card>
-    </Fade>
-  );
+        {renderSkeletons()}
+      </motion.div>
+    );
+  }
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box sx={{ 
-        p: 3, 
-        height: '100%', 
-        overflow: 'auto',
-        // background: `linear-gradient(120deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.1)} 100%)`,
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={handleBack} sx={{ color: 'white' }}>
-            Back
-          </Button>
-          <Typography variant="h5" component="h1" sx={{ ml: 2, flexGrow: 1, color: 'white', fontWeight: 'bold' }}>
-            Create/Edit Trigger
-          </Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            onClick={handleSubmit}
-            sx={{
-              transition: 'all 0.3s',
-              '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 4px 20px 0 rgba(0,0,0,0.12)',
-              }
-            }}
-          >
-            Save Trigger
-          </Button>
-        </Box>
-        <Grid container spacing={4} direction={isSmallScreen ? 'column' : 'row'}>
-          <Grid component="div"  sx={{ xs: 12, md: 6, height: '100%'}}
-          size={{xs:12, sm:6, md:6, lg:6}}>
-            {renderTriggerSettings()}
-          </Grid>
-          <Grid component="div" sx={{ xs: 12, md: 6, height: '100%' }} size={{xs:12, sm:6, md:6, lg:6}}>
-            {renderRunSettings()}
-          </Grid>
-        </Grid>
-      </Box>
-    </LocalizationProvider>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.5 }}
+      style={{ height: '100%', overflow: 'auto' }}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        initialValues={{
+          frequency: 'once',
+          timeoutStatus: 'failed',
+          slaTimeUnit: 'minutes',
+          startDateTime: dayjs(),
+        }}
+      >
+        <Space direction="vertical" size="middle" style={{ display: 'flex', width: '100%' }}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <Card title="Trigger Settings" style={{ height: '100%' }}>
+                  <Form.Item name="triggerName" label="Trigger Name" rules={[{ required: true }]}>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name="triggerDescription" label="Trigger Description">
+                    <TextArea rows={4} />
+                  </Form.Item>
+                  <Form.Item name="frequency" label="Frequency" rules={[{ required: true }]}>
+                    <Select onChange={(value) => setFrequency(value)}>
+                      <Option value="@once">Once</Option>
+                      <Option value="@hourly">Hourly</Option>
+                      <Option value="@daily">Daily</Option>
+                      <Option value="@weekly">Weekly</Option>
+                      <Option value="@monthly">Monthly</Option>
+                      <Option value="@always_on">Always On</Option>
+                      <Option value="custom">Custom</Option>
+                    </Select>
+                  </Form.Item>
+                  <AnimatePresence>
+                    {frequency === 'custom' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Form.Item
+                          name="customCron"
+                          label="Cron Expression"
+                          rules={[
+                            { required: true, message: 'Please input the cron expression!' },
+                            { 
+                              validator: (_, value) => 
+                                isCronExpression(value) 
+                                  ? Promise.resolve() 
+                                  : Promise.reject('Invalid cron expression')
+                            }
+                          ]}
+                          help={!isCronValid && "Invalid cron expression format"}
+                          validateStatus={!isCronValid ? "error" : ""}
+                        >
+                          <Input
+                            placeholder="e.g. 0 0 * * *"
+                            onChange={(e) => handleCronExpressionChange(e.target.value)}
+                          />
+                        </Form.Item>
+                        {cronDefinition && (
+                          <Alert
+                            message="Cron Definition"
+                            description={cronDefinition}
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 8 }}
+                          />
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <Form.Item name="startDateTime" label="Start Date and Time" rules={[{ required: true }]}>
+                    <DatePicker 
+                      showTime 
+                      style={{ width: '100%' }} 
+                      format="YYYY-MM-DD HH:mm:ss"
+                    />
+                  </Form.Item>
+                </Card>
+              </motion.div>
+            </Col>
+            <Col xs={24} lg={12}>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <Card title="Run Settings" style={{ height: '100%' }}>
+                  <Form.Item name="timeout" label="Timeout for each run (optional)">
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name="timeoutStatus" label="Status for runs that exceed the timeout">
+                    <Select>
+                      <Option value="failed">Failed</Option>
+                      <Option value="timeout">Timeout</Option>
+                      <Option value="cancel">Cancel</Option>
+                    </Select>
+                  </Form.Item>
+                  <Form.Item name="configureSLA" label="Configure trigger SLA" valuePropName="checked">
+                    <Switch onChange={(checked) => setConfigureSLA(checked)} />
+                  </Form.Item>
+                  <AnimatePresence>
+                    {configureSLA && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Space style={{ display: 'flex' }}>
+                          <Form.Item name="slaTime" label="SLA Time" rules={[{ required: true }]}>
+                            <Input style={{ width: 100 }} />
+                          </Form.Item>
+                          <Form.Item name="slaTimeUnit" label="Time Unit" rules={[{ required: true }]}>
+                            <Select style={{ width: 100 }}>
+                              <Option value="minutes">Minutes</Option>
+                              <Option value="hours">Hours</Option>
+                              <Option value="days">Days</Option>
+                            </Select>
+                          </Form.Item>
+                        </Space>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <Form.Item name="keepRunning" valuePropName="checked">
+                    <Checkbox>Keep running pipeline even if blocks fail</Checkbox>
+                  </Form.Item>
+                  <Form.Item name="skipRun" valuePropName="checked">
+                    <Checkbox>Skip run if previous run still in progress</Checkbox>
+                  </Form.Item>
+                  <Form.Item name="createInitialRun" valuePropName="checked">
+                    <Checkbox>Create initial pipeline run if start date is before current execution period</Checkbox>
+                  </Form.Item>
+                  
+                  <Divider />
+                  
+                  <Title level={5}>Runtime Variables</Title>
+                  <AnimatePresence>
+                    {runtimeVariables.map((variable, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Space style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                          <Input
+                            placeholder="Variable UUID"
+                            value={variable.uuid}
+                            onChange={(e) => updateRuntimeVariable(index, 'uuid', e.target.value)}
+                            style={{ width: 200 }}
+                          />
+                          <Input
+                            placeholder="Value"
+                            value={variable.value}
+                            onChange={(e) => updateRuntimeVariable(index, 'value', e.target.value)}
+                            style={{ width: 200 }}
+                          />
+                          <Button
+                            type="text"
+                            icon={<DeleteOutlined />}
+                            onClick={() => removeRuntimeVariable(index)}
+                          />
+                        </Space>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  <Button type="dashed" onClick={addRuntimeVariable} block icon={<PlusOutlined />}>
+                    Add Runtime Variable
+                  </Button>
+                </Card>
+              </motion.div>
+            </Col>
+          </Row>
+          <Form.Item>
+            <Button type="primary" htmlType="submit">
+              {scheduleId ? 'Update Trigger' : 'Create Trigger'}
+            </Button>
+          </Form.Item>
+        </Space>
+      </Form>
+    </motion.div>
   );
 };
 

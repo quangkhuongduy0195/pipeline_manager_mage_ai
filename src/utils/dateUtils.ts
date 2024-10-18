@@ -1,49 +1,48 @@
 import { format, parseISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 
-export const formatDate = (dateString: string) => {
-  const date = parseISO(dateString);
-  const zonedDate = toZonedTime(date, 'Asia/Ho_Chi_Minh');
-  return format(zonedDate, 'yyyy/MM/dd HH:mm:ss');
+export const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'N/A';
+  try {
+    const date = parseISO(dateString);
+    return format(date, 'dd/MM/yyyy HH:mm:ss');
+  } catch (error) {
+    return 'Invalid Date';
+  }
 };
 
 export const defineCron = (cronExpression: string): string => {
   const parts = cronExpression.split(' ');
   if (parts.length !== 5) {
-    return 'Invalid Cron expression';
+    return 'Invalid cron expression';
   }
 
   const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
 
-  let definition = '';
+  let description = 'Runs ';
 
   if (minute === '*') {
-    definition += 'Every minute ';
+    description += 'every minute';
   } else {
-    definition += `At minute ${minute} `;
+    description += `at minute ${minute}`;
   }
 
   if (hour === '*') {
-    definition += 'of every hour ';
+    description += ' of every hour';
   } else {
-    definition += `of hour ${hour} `;
+    description += ` of hour ${hour}`;
   }
 
   if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-    definition += 'every day';
-  } else {
-    if (dayOfMonth !== '*') {
-      definition += `on day ${dayOfMonth} of the month `;
-    }
-    if (month !== '*') {
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      definition += `in ${monthNames[parseInt(month) - 1]} `;
-    }
-    if (dayOfWeek !== '*') {
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      definition += `on ${dayNames[parseInt(dayOfWeek)]}`;
-    }
+    description += ' every day';
+  } else if (dayOfMonth !== '*') {
+    description += ` on day ${dayOfMonth} of the month`;
+  } else if (dayOfWeek !== '*') {
+    description += ` on ${dayOfWeek} of the week`;
   }
 
-  return `${definition.trim()} (UTC+0)`;
+  if (month !== '*') {
+    description += ` in month ${month}`;
+  }
+
+  return description;
 };

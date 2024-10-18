@@ -1,34 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Typography, 
   Button, 
-  Box, 
-  CircularProgress, 
   Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper, 
+  Space, 
+  Typography,
+  Card,
+  List,
+  Tag,
+  Row,
+  Col,
+  Statistic,
+  Skeleton,
+  message,
+  Modal,
+  Tabs,
+  Timeline,
   Tooltip,
-  useMediaQuery,
-  useTheme,
-  alpha,
-  tableCellClasses
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import HelpIcon from '@mui/icons-material/Help';
-import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import EditIcon from '@mui/icons-material/Edit';
-import { fetchPipelineRuns, togglePipelineSchedule, runPipelineOnce } from '../services/api';
+  Collapse,
+  Divider,
+  Affix
+} from 'antd';
+import { 
+  CheckCircleOutlined, 
+  CloseCircleOutlined, 
+  LoadingOutlined,
+  QuestionCircleOutlined,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
+  EditOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  CalendarOutlined,
+  FieldTimeOutlined,
+  CodeOutlined
+} from '@ant-design/icons';
+import { fetchPipelineRuns, togglePipelineSchedule, runPipelineOnce, fetchPipelineLogs } from '../services/api';
 import { formatDate } from '../utils/dateUtils';
-import { useTrail, animated } from 'react-spring';
+import { useHeader } from '../contexts/HeaderContext';
+import { useMediaQuery } from 'react-responsive';
+import { motion } from 'framer-motion';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+
+const { Title, Text, Paragraph } = Typography;
+const { TabPane } = Tabs;
+const { Panel } = Collapse;
 
 interface PipelineRun {
   id: string;
@@ -37,19 +54,29 @@ interface PipelineRun {
   completed_at: string;
 }
 
-const AnimatedTableRow = animated(TableRow);
+interface LogData {
+  block_run_logs: { name: string; content: string, path: string }[];
+  pipeline_run_logs: { name: string; content: string, path: string }[];
+}
 
 const PipelineRuns: React.FC = () => {
-  const { scheduleId, name, token, status: initialStatus } = useParams<{ scheduleId: string; name: string; token: string; status: string }>();
+  const { id, scheduleId, name, token, status: initialStatus } = useParams<{ id: string; scheduleId: string; name: string; token: string; status: string }>();
   const navigate = useNavigate();
   const [runs, setRuns] = useState<PipelineRun[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState(initialStatus);
-  const theme = useTheme();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const { setTitle, setShowBackButton } = useHeader();
+  const isMobile = useMediaQuery({ maxWidth: 767 });
+  const [messageApi, contextHolder] = message.useMessage();
+  const [selectedRunLog, setSelectedRunLog] = useState<string | null>(null);
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const [pipelineLogs, setPipelineLogs] = useState<string | null>(null);
+  const [isPipelineLogsModalVisible, setIsPipelineLogsModalVisible] = useState(false);
+  const [logData, setLogData] = useState<LogData | null>(null);
 
   useEffect(() => {
+    setTitle(`Pipeline Runs: ${decodeURIComponent(name || '')}`);
+    setShowBackButton(true);
     const loadPipelineRuns = async () => {
       if (!scheduleId) return;
       try {
@@ -57,29 +84,24 @@ const PipelineRuns: React.FC = () => {
         setRuns(data.pipeline_runs);
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching pipeline runs:', err);
-        setError('Failed to load pipeline runs. Please try again later.');
+        messageApi.error('Failed to load pipeline runs. Please try again later.');
         setLoading(false);
       }
     };
 
     loadPipelineRuns();
-  }, [scheduleId]);
-
-  const handleBack = () => {
-    navigate(-1);
-  };
+  }, [scheduleId, name, setTitle, setShowBackButton, messageApi]);
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'completed':
-        return <CheckCircleIcon color="success" />;
+        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
       case 'failed':
-        return <ErrorIcon color="error" />;
+        return <CloseCircleOutlined style={{ color: '#f5222d' }} />;
       case 'running':
-        return <HourglassEmptyIcon color="primary" />;
+        return <LoadingOutlined style={{ color: '#1890ff' }} />;
       default:
-        return <HelpIcon color="disabled" />;
+        return <QuestionCircleOutlined style={{ color: '#faad14' }} />;
     }
   };
 
@@ -100,13 +122,12 @@ const PipelineRuns: React.FC = () => {
       const response = await togglePipelineSchedule(scheduleId, status || '');
       if (response && response.pipeline_schedule) {
         setStatus(response.pipeline_schedule.status);
-        // Cập nhật URL với trạng thái mới
-        navigate(`/pipelines/${scheduleId}/runs/${name}/${token}/${response.pipeline_schedule.status}`, { replace: true });
+        navigate(`/pipelines/${id}/runs/${scheduleId}/${name}/${token}/${response.pipeline_schedule.status}`, { replace: true });
+        messageApi.success(`Trigger ${response.pipeline_schedule.status === 'active' ? 'enabled' : 'disabled'} successfully`);
       }
+      setLoading(false);
     } catch (err) {
-      console.error('Error toggling pipeline schedule:', err);
-      setError('Failed to toggle pipeline schedule. Please try again later.');
-    } finally {
+      messageApi.error('Failed to toggle pipeline schedule. Please try again later.');
       setLoading(false);
     }
   };
@@ -115,182 +136,373 @@ const PipelineRuns: React.FC = () => {
     if (!scheduleId || !token) return;
     try {
       setLoading(true);
-      const response = await runPipelineOnce(scheduleId, token);
-      // Xử lý response nếu cần
-      console.log('Pipeline run started:', response);
-      // Refresh danh sách runs
+      await runPipelineOnce(scheduleId, token);
+      messageApi.success('Pipeline run started successfully');
       const updatedRuns = await fetchPipelineRuns(scheduleId);
       setRuns(updatedRuns.pipeline_runs);
+      setLoading(false);
     } catch (err) {
-      console.error('Error running pipeline:', err);
-      setError('Failed to start pipeline run. Please try again later.');
-    } finally {
+      messageApi.error('Failed to start pipeline run. Please try again later.');
       setLoading(false);
     }
   };
 
   const handleEditTrigger = () => {
-    // Implement edit trigger logic
-    console.log('Edit trigger clicked');
+    if (id && scheduleId) {
+      navigate(`/pipelines/${id}/schedules/edit/${scheduleId}`);
+    }
   };
 
-  const trail = useTrail(runs.length, {
-    from: { opacity: 0, transform: 'scale(0.9)' },
-    to: { opacity: 1, transform: 'scale(1)' },
-    config: {
-      tension: 1000,
-      friction: 50
+  const handleViewLog = async (runId: string) => {
+    try {
+      if (!id) return;
+      const logData = await fetchPipelineLogs(id, runId);
+      setLogData(logData.logs[0]);
+      setIsLogModalVisible(true);
+    } catch (err) {
+      messageApi.error('Failed to fetch run log. Please try again later.');
+    }
+  };
+
+  const columns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
     },
-  });
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <Space>
+          {getStatusIcon(status)}
+          <span>{status}</span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Started At',
+      dataIndex: 'started_at',
+      key: 'started_at',
+      render: (date: string | null) => formatDate(date),
+    },
+    {
+      title: 'Finished At',
+      dataIndex: 'completed_at',
+      key: 'completed_at',
+      render: (date: string | null) => formatDate(date),
+    },
+    {
+      title: 'Execution Time',
+      key: 'execution_time',
+      render: (_: any, record: PipelineRun) => calculateExecutionTime(record.started_at, record.completed_at),
+    },
+    {
+      title: 'Logs',
+      key: 'actions',
+      render: (_: any, record: PipelineRun) => (
+        <Button 
+          icon={<FileTextOutlined />} 
+          onClick={() => handleViewLog(record.id)}
+        >
+          View Log
+        </Button>
+      ),
+    },
+  ];
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed': return 'green';
+      case 'failed': return 'red';
+      case 'running': return 'blue';
+      default: return 'default';
+    }
+  };
 
-  if (error) {
+  const renderRunCard = (run: PipelineRun) => (
+    <Card
+      key={run.id}
+      hoverable
+      style={{ marginBottom: 16 }}
+    >
+      <Row gutter={[16, 16]} align="middle">
+        <Col span={6}>
+          <Statistic
+            title="Status"
+            value={run.status}
+            valueStyle={{ color: getStatusColor(run.status) }}
+            prefix={getStatusIcon(run.status)}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="Started At"
+            value={formatDate(run.started_at)}
+            prefix={<CalendarOutlined />}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="Finished At"
+            value={run.completed_at ? formatDate(run.completed_at) : 'N/A'}
+            prefix={<CalendarOutlined />}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="Execution Time"
+            value={calculateExecutionTime(run.started_at, run.completed_at)}
+            prefix={<FieldTimeOutlined />}
+          />
+        </Col>
+      </Row>
+      <Row style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Button 
+            type="primary"
+            icon={<FileTextOutlined />}
+            onClick={() => handleViewLog(run.id)}
+          >
+            View Log
+          </Button>
+        </Col>
+      </Row>
+    </Card>
+  );
+
+  const renderTimeline = () => (
+    <Timeline mode="left">
+      {runs.map((run) => (
+        <Timeline.Item
+          key={run.id}
+          color={getStatusColor(run.status)}
+          label={formatDate(run.started_at)}
+        >
+          <Text strong>{`Run ${run.id}`}</Text>
+          <Tag color={getStatusColor(run.status)} style={{ marginLeft: 8 }}>
+            {run.status}
+          </Tag>
+          <br />
+          <Text type="secondary">
+            {`Duration: ${calculateExecutionTime(run.started_at, run.completed_at)}`}
+          </Text>
+          <br />
+          <Button 
+            type="link" 
+            icon={<FileTextOutlined />}
+            onClick={() => handleViewLog(run.id)}
+          >
+            View Log
+          </Button>
+        </Timeline.Item>
+      ))}
+    </Timeline>
+  );
+
+  const renderLogContent = (content: string) => {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-        <Typography color="error">{error}</Typography>
-      </Box>
+      <SyntaxHighlighter language="plaintext" style={docco} showLineNumbers>
+        {content}
+      </SyntaxHighlighter>
     );
-  }
+  };
 
   return (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      overflow: isSmallScreen ? 'auto' : 'hidden',
-      p: 3
-    }}>
-      <Box sx={{ mb: 4 }}> {/* Increase bottom margin */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            sx={{ color: 'white', fontWeight: 'bold' }}
-          >
-            Pipeline Schedules
-          </Button>
-          <Typography
-            component="h1" 
-            sx={{ 
-              display: { xs: 'none', sm: 'block' },
-              color: 'white',
-              fontWeight: 'bold'
-            }}>
-            / {decodeURIComponent(name || '')}
-          </Typography>
-        </Box>
-        <Box sx={{ 
-          mb: 3, 
-          display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' }, 
-          alignItems: 'center',
-          gap: 2 // Add gap between buttons
-        }}>
-          <Tooltip title={status === 'active' ? 'Disable Trigger' : 'Enable Trigger'}>
-            <Button
-              startIcon={status === 'active' ? <PauseCircleOutlineIcon /> : <PlayCircleOutlineIcon />}
-              onClick={handleDisableTrigger}
-              variant="contained"
-              color="primary"
-              sx={{ width: { xs: '100%', sm: 'auto' } }}
-              disabled={loading}
-            >
-              {status === 'active' ? 'Disable Trigger' : 'Enable Trigger'}
-            </Button>
-          </Tooltip>
-          <Tooltip title="Run@once">
-            <Button
-              startIcon={<PlayCircleOutlineIcon />}
-              onClick={handleRunOnce}
-              variant="contained"
-              color="secondary"
-              sx={{ width: { xs: '100%', sm: 'auto' } }}
-              disabled={loading}
-            >
-              Run@once
-            </Button>
-          </Tooltip>
-          <Tooltip title="Edit Trigger">
-            <Button
-              startIcon={<EditIcon />}
-              onClick={handleEditTrigger}
-              variant="outlined"
-              color="primary"
-              sx={{ width: { xs: '100%', sm: 'auto' } }}
-            >
-              Edit Trigger
-            </Button>
-          </Tooltip>
-        </Box>
-      </Box>
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto', 
-          boxShadow: 3,
-          backgroundColor: alpha(theme.palette.background.paper, 0.01), // Adjust opacity here
-          backdropFilter: 'blur(1px)' // This adds a blur effect
-        }}
+    <>
+      {contextHolder}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
       >
-        <Table stickyHeader sx={{
-          [`& .${tableCellClasses.root}`]: {
-            borderBottom: "0.5px solid #1976d2",
-          }
-        }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>ID</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Started At</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Finished At</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: alpha(theme.palette.primary.main, 1), color: 'white' }}>Execution Time</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {trail.map((style, index) => (
-              <AnimatedTableRow 
-                key={runs[index].id}
-                style={style}
-                sx={{ 
-                  cursor: 'pointer',
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                  },
-                }}
-              >
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>{runs[index].id}</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    {getStatusIcon(runs[index].status || '')}
-                    <Typography sx={{ ml: 1 }}>{runs[index].status || 'N/A'}</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>{runs[index].started_at ? formatDate(runs[index].started_at) : 'N/A'}</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>{runs[index].completed_at ? formatDate(runs[index].completed_at) : 'N/A'}</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>{runs[index].completed_at || runs[index].started_at ? calculateExecutionTime(runs[index].started_at, runs[index].completed_at) : 'N/A'}</TableCell>
-              </AnimatedTableRow>
-            ))}
-            {runs.length === 0 && (
-              <TableRow>
-              <TableCell colSpan={5}>
-                  <Typography sx={{ mt: 4, color: 'white', textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                    No pipeline runs found for this schedule.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
+        <Space direction="vertical" size="middle" style={{ display: 'flex', width: '100%' }}>
+          <Affix offsetTop={64}>
+            <div style={{ backgroundColor: '#fff', padding: '16px 0', zIndex: 10 }}>
+              <Title level={2}>{decodeURIComponent(name || '')}</Title>
+              <Tabs defaultActiveKey="1" type="card" style={{ marginBottom: 16 }}>
+                <TabPane tab="Overview" key="1" />
+                <TabPane tab="Card View" key="2" />
+                <TabPane tab="Timeline View" key="3" />
+                <TabPane tab="Table View" key="4" />
+              </Tabs>
+            </div>
+          </Affix>
+
+          <Card>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={8}>
+                <Statistic 
+                  title="Total Runs" 
+                  value={runs.length} 
+                  prefix={<ClockCircleOutlined />} 
+                />
+              </Col>
+              <Col xs={24} md={8}>
+                <Statistic 
+                  title="Successful Runs" 
+                  value={runs.filter(run => run.status.toLowerCase() === 'completed').length}
+                  valueStyle={{ color: '#3f8600' }}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Col>
+              <Col xs={24} md={8}>
+                <Statistic 
+                  title="Failed Runs" 
+                  value={runs.filter(run => run.status.toLowerCase() === 'failed').length}
+                  valueStyle={{ color: '#cf1322' }}
+                  prefix={<CloseCircleOutlined />}
+                />
+              </Col>
+            </Row>
+          </Card>
+          <Card>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={8}>
+                <Tooltip title={status === 'active' ? 'Disable Trigger' : 'Enable Trigger'}>
+                  <Button
+                    type={status === 'active' ? 'primary' : 'default'}
+                    icon={status === 'active' ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                    onClick={handleDisableTrigger}
+                    style={{ width: '100%' }}
+                    danger={status === 'active'}
+                  >
+                    {status === 'active' ? 'Disable' : 'Enable'}
+                  </Button>
+                </Tooltip>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Tooltip title="Run pipeline once">
+                  <Button
+                    type="primary"
+                    icon={<PlayCircleOutlined />}
+                    onClick={handleRunOnce}
+                    style={{ width: '100%' }}
+                  >
+                    Run Once
+                  </Button>
+                </Tooltip>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Tooltip title="Edit trigger settings">
+                  <Button
+                    icon={<EditOutlined />}
+                    onClick={handleEditTrigger}
+                    style={{ width: '100%' }}
+                  >
+                    Edit Trigger
+                  </Button>
+                </Tooltip>
+              </Col>
+            </Row>
+          </Card>
+          {loading ? (
+            <Skeleton active />
+          ) : (
+            <Tabs defaultActiveKey="1">
+              <TabPane tab="Card View" key="1">
+                <List
+                  grid={{ gutter: 16, xs: 1, sm: 1, md: 1, lg: 1, xl: 1, xxl: 1 }}
+                  dataSource={runs}
+                  renderItem={renderRunCard}
+                />
+              </TabPane>
+              <TabPane tab="Timeline View" key="2">
+                {renderTimeline()}
+              </TabPane>
+              <TabPane tab="Table View" key="3">
+                <Table 
+                  columns={columns} 
+                  dataSource={runs} 
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                />
+              </TabPane>
+            </Tabs>
+          )}
+        </Space>
+      </motion.div>
+      
+      <Modal
+        title={
+          <Space>
+            <FileTextOutlined />
+            <span>Pipeline Run Log</span>
+          </Space>
+        }
+        open={isLogModalVisible}
+        onCancel={() => setIsLogModalVisible(false)}
+        footer={null}
+        width={1200}
+        style={{ top: 20 }}
+      >
+        {logData && (
+          <Tabs defaultActiveKey="1" type="card">
+            <TabPane 
+              tab={
+                <span>
+                  <CodeOutlined />
+                  Block Run Logs
+                </span>
+              } 
+              key="1"
+            >
+              <Collapse accordion>
+                {logData.block_run_logs.map((log, index) => (
+                  <Panel 
+                    header={
+                      <Space>
+                        <FileTextOutlined />
+                        <Text strong>{log.name}</Text>
+                        <Tag color="blue">{log.path}</Tag>
+                      </Space>
+                    } 
+                    key={index}
+                  >
+                    <Card
+                      bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+                    >
+                      {renderLogContent(log.content)}
+                    </Card>
+                  </Panel>
+                ))}
+              </Collapse>
+            </TabPane>
+            <TabPane 
+              tab={
+                <span>
+                  <CodeOutlined />
+                  Pipeline Run Logs
+                </span>
+              } 
+              key="2"
+            >
+              <Collapse accordion>
+                {logData.pipeline_run_logs.map((log, index) => (
+                  <Panel 
+                    header={
+                      <Space>
+                        <FileTextOutlined />
+                        <Text strong>{log.name}</Text>
+                        <Tag color="green">{log.path}</Tag>
+                      </Space>
+                    } 
+                    key={index}
+                  >
+                    <Card
+                      bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+                    >
+                      {renderLogContent(log.content)}
+                    </Card>
+                  </Panel>
+                ))}
+              </Collapse>
+            </TabPane>
+          </Tabs>
+        )}
+      </Modal>
+    </>
   );
 };
 

@@ -1,155 +1,209 @@
-import React, { useState } from 'react';
-import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, Typography, AppBar, Toolbar, IconButton, Divider } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import MenuIcon from '@mui/icons-material/Menu';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import ViewModuleIcon from '@mui/icons-material/ViewModule';
-import LogoutIcon from '@mui/icons-material/Logout';
+import React, { useState, useEffect } from 'react';
+import { Layout as AntLayout, Menu, theme, Button, Typography, Space, Avatar, Divider, Drawer } from 'antd';
+import {
+  MenuUnfoldOutlined,
+  MenuFoldOutlined,
+  DashboardOutlined,
+  AccountBookOutlined,
+  ScheduleOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import Close from '@mui/icons-material/Close';
-import { removeToken } from '../services/tokenManager';
+import { useHeader } from '../contexts/HeaderContext';
+import { useUser } from '../contexts/UserContext';
+import { clearUserData } from '../services/tokenManager';
 
-const drawerWidth = 240;
-
-const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
-  open?: boolean;
-}>(({ theme, open }) => ({
-  flexGrow: 1,
-  transition: theme.transitions.create('margin', {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
-  marginLeft: `-${drawerWidth}px`,
-  ...(open && {
-    transition: theme.transitions.create('margin', {
-      easing: theme.transitions.easing.easeOut,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-    marginLeft: 0,
-  }),
-  width: `calc(100% - ${drawerWidth}px)`,
-  height: '100vh',
-  overflow: 'auto',
-}));
-
-const DrawerHeader = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
-  justifyContent: 'flex-end',
-}));
+const { Header, Sider, Content } = AntLayout;
+const { Text } = Typography;
 
 const Layout: React.FC = () => {
-  const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { title, showBackButton } = useHeader();
+  const {
+    token: { colorBgContainer, borderRadiusLG },
+  } = theme.useToken();
+  const { userInfo } = useUser();
+  const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth <= 768);
 
-  const handleDrawerOpen = () => {
-    setOpen(true);
-  };
+  useEffect(() => {
+    const handleResize = () => {
+      const smallScreen = window.innerWidth <= 768;
+      setIsSmallScreen(smallScreen);
+      if (smallScreen) {
+        setCollapsed(true);
+      }
+    };
 
-  const handleDrawerClose = () => {
-    setOpen(false);
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const menuItems = [
+    { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
+    { key: '/pipelines', icon: <AccountBookOutlined />, label: 'Pipelines' },
+    { key: '/schedules', icon: <ScheduleOutlined />, label: 'Schedules' },
+    { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
+  ];
+
+  const handleBack = () => {
+    navigate(-1);
   };
 
   const handleLogout = () => {
-    removeToken();
+    clearUserData();
     navigate('/login');
   };
 
-  const menuItems = [
-    { text: 'Pipelines', icon: <DashboardIcon />, path: '/pipelines' },
-    { text: 'Blocks', icon: <ViewModuleIcon />, path: '/pipelines/blocks' },
-  ];
+  const toggleDrawer = () => {
+    setDrawerOpen(!drawerOpen);
+  };
+
+  const renderMenu = () => (
+    <>
+      <div style={{ 
+        padding: '16px', 
+        textAlign: 'center', 
+        transition: 'all 0.3s',
+        height: 'auto',
+        minHeight: collapsed ? '80px' : '140px',
+        overflow: 'hidden'
+      }}>
+        <Avatar 
+          size={collapsed ? 48 : 64} 
+          icon={<UserOutlined />} 
+          src={userInfo?.avatar} 
+          style={{ marginBottom: '8px' }}
+        />
+        {(!collapsed || drawerOpen) && (
+          <>
+            <Text strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {userInfo?.username}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>{userInfo?.roles_display}</Text>
+          </>
+        )}
+      </div>
+      <Divider style={{ margin: '0 0 8px 0' }} />
+      <Menu
+        theme="light"
+        mode="inline"
+        selectedKeys={[location.pathname]}
+        items={menuItems}
+        onClick={({ key }) => {
+          navigate(key);
+          if (isSmallScreen) {
+            setDrawerOpen(false);
+          }
+        }}
+        style={{ borderRight: 0 }}
+      />
+      <Divider style={{ margin: '8px 0' }} />
+      <Menu
+        theme="light"
+        mode="inline"
+        selectable={false}
+        style={{ borderRight: 0 }}
+        items={[
+          {
+            key: 'logout',
+            icon: <LogoutOutlined />,
+            label: 'Logout',
+            onClick: handleLogout,
+          },
+        ]}
+      />
+    </>
+  );
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            onClick={handleDrawerOpen}
-            edge="start"
-            sx={{ mr: 2, ...(open && { display: 'none' }) }}
-          >
-            <MenuIcon />
-          </IconButton>
-          {open && (
-            <IconButton
-              color="inherit"
-              edge="start"
-              sx={{ mr: 2 }}
-              onClick={handleDrawerClose}
-            >
-              <Close />
-            </IconButton>
-          )}
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Pipeline Manager
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      <Drawer
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-          },
-        }}
-        variant="persistent"
-        anchor="left"
-        open={open}
-      >
-        <DrawerHeader>
-          <IconButton onClick={handleDrawerClose}>
-            <ChevronLeftIcon />
-          </IconButton>
-        </DrawerHeader>
-        <List>
-          {menuItems.map((item) => (
-            <ListItem
-              key={item.text}
-              onClick={() => {
-                navigate(item.path);
-                if (window.innerWidth < 600) {
-                  handleDrawerClose();
-                }
+    <AntLayout style={{ minHeight: '100vh' }}>
+      {isSmallScreen ? (
+        <Drawer
+          placement="left"
+          closable={false}
+          onClose={toggleDrawer}
+          open={drawerOpen}
+          styles={{ body: { padding: 0 } }}
+          width={200}
+        >
+          {renderMenu()}
+        </Drawer>
+      ) : (
+        <Sider 
+          trigger={null} 
+          collapsible 
+          collapsed={collapsed}
+          style={{
+            overflow: 'auto',
+            height: '100vh',
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 1001,
+            boxShadow: '2px 0 8px 0 rgba(29,35,41,.05)',
+          }}
+          theme="light"
+        >
+          {renderMenu()}
+        </Sider>
+      )}
+      <AntLayout style={{ marginLeft: isSmallScreen ? 0 : (collapsed ? 80 : 200), transition: 'all 0.2s' }}>
+        <Header 
+          style={{ 
+            padding: '0 0px', 
+            background: colorBgContainer, 
+            position: 'fixed', 
+            top: 0, 
+            zIndex: 1000, 
+            width: '100%',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 1px 4px rgba(0,21,41,.08)',
+          }}
+        >
+          <Space>
+            <Button
+              type="text"
+              icon={isSmallScreen ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
+              onClick={isSmallScreen ? toggleDrawer : () => setCollapsed(!collapsed)}
+              style={{
+                fontSize: '16px',
+                width: 64,
+                height: 64,
+                borderRadius: '0%',
               }}
-              sx={{
-                backgroundColor: location.pathname === item.path ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                },
-              }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItem>
-          ))}
-        </List>
-        <Box sx={{ flexGrow: 1 }} />
-        <Divider />
-        <List>
-          <ListItem key='logout' onClick={handleLogout}>
-            <ListItemIcon>
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText primary="Đăng xuất" />
-          </ListItem>
-        </List>
-      </Drawer>
-      <Main open={open}>
-        <DrawerHeader />
-        <Box sx={{ height: 'calc(100% - 64px)', overflow: 'auto' }}>
+            />
+            {showBackButton && (
+              <Button onClick={handleBack}>
+                Back
+              </Button>
+            )}
+            <Text strong>{title}</Text>
+          </Space>
+        </Header>
+        <Content
+          style={{
+            margin: '88px 16px 24px',
+            padding: 24,
+            background: colorBgContainer,
+            borderRadius: borderRadiusLG,
+            minHeight: 280,
+          }}
+        >
           <Outlet />
-        </Box>
-      </Main>
-    </Box>
+        </Content>
+      </AntLayout>
+    </AntLayout>
   );
 };
 

@@ -101,6 +101,82 @@ export const runPipelineOnce = async (scheduleId: string, token: string) => {
   }
 };
 
+export const createPipelineSchedule = async (pipelineId: string, name: string) => {
+  try {
+    const response = await api.post(`/pipelines/${pipelineId}/pipeline_schedules`, {
+      pipeline_schedule: { name },
+      api_key: import.meta.env.VITE_API_KEY
+    });
+    return response.data.pipeline_schedule.id || null; // Giả sử API trả về ID trong trường này
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updatePipelineSchedule = async (scheduleId: string, scheduleData: any) => {
+  try {
+    const response = await api.put(`/pipeline_schedules/${scheduleId}`, {
+      pipeline_schedule: scheduleData,
+      api_key: import.meta.env.VITE_API_KEY
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Thêm các hàm gọi API khác ở đây trong tơng lai
 
 export default api;
+
+// Thêm hàm mới này vào file api.ts
+export const fetchPipelineVariables = async (pipelineId: string) => {
+  try {
+    const response = await api.get(`/pipelines/${pipelineId}/variables`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Thêm hàm này vào cuối file src/services/api.ts
+export const deletePipelineSchedule = async (scheduleId: string) => {
+  try {
+    const response = await api.delete(`/pipeline_schedules/${scheduleId}`, {
+      params: { api_key: import.meta.env.VITE_API_KEY }
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Thêm hàm này vào file src/services/api.ts
+export const fetchPipeline = async (pipelineId: string) => {
+  try {
+    const response = await api.get(`/pipelines/${pipelineId}`);
+    return response.data.pipeline;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Thêm hàm này vào cuối file src/services/api.ts
+export const fetchPipelineRunLog = async (runId: string) => {
+  try {
+    const response = await api.get(`/pipeline_runs/${runId}/log`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Thêm hàm mới này vào cuối file
+export const fetchPipelineLogs = async (pipelineUuid: string, runId: string) => {
+  try {
+    const response = await api.get(`/pipelines/${pipelineUuid}/logs?pipeline_run_id[]=${runId}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

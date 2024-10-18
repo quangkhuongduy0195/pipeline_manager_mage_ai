@@ -1,201 +1,137 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, 
-  Card, 
-  CardContent, 
-  CardActions, 
-  Button, 
-  CircularProgress, 
-  Box,
-  Chip,
-  Modal,
-  Paper
-} from '@mui/material';
-import Grid from '@mui/material/Grid2';
-import { fetchPipelines } from '../services/api';
-
+import { Card, Typography,  Row, Col, Tag, message, Input, Skeleton } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { useTrail, animated, config } from 'react-spring';
-import { Helmet } from 'react-helmet';
+import { SearchOutlined } from '@ant-design/icons';
+import { fetchPipelines } from '../services/api';
+import { useHeader } from '../contexts/HeaderContext';
+import { motion } from 'framer-motion';
+
+const { Paragraph } = Typography;
+const { Meta } = Card;
 
 interface Pipeline {
   uuid: string;
   name: string;
   description?: string;
   status?: string;
-  tags?: string[] | null;
+  tags?: string[];
 }
 
-const AnimatedGrid = animated(Grid);
-
 const Pipelines: React.FC = () => {
+  const { setTitle, setShowBackButton } = useHeader();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [filteredPipelines, setFilteredPipelines] = useState<Pipeline[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null);
-  const [openModal, setOpenModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
+    setTitle('Pipelines');
+    setShowBackButton(false);
     const loadPipelines = async () => {
       try {
         const data = await fetchPipelines();
-        setPipelines(data.pipelines);
+        if (data && Array.isArray(data.pipelines)) {
+          setPipelines(data.pipelines);
+          setFilteredPipelines(data.pipelines);
+        } else {
+          message.error('Failed to load pipelines. Unexpected data structure.');
+        }
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching pipelines:', err);
-        setError('Failed to load pipelines. Please try again later.');
+        message.error('Failed to load pipelines. Please try again later.');
         setLoading(false);
       }
     };
 
     loadPipelines();
-  }, []);
+  }, [setTitle, setShowBackButton]);
 
-  const handleCloseModal = () => {
-    setOpenModal(false);
-    setSelectedPipeline(null);
-  };
+  useEffect(() => {
+    const filtered = pipelines.filter(pipeline => 
+      pipeline.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pipeline.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pipeline.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    setFilteredPipelines(filtered);
+  }, [searchTerm, pipelines]);
 
   const handlePipelineClick = (pipelineId: string) => {
     navigate(`/pipelines/${pipelineId}/schedules`);
   };
 
-  const trail = useTrail(pipelines.length, {
-    from: { opacity: 0, transform: 'translate3d(0,40px,0)' },
-    to: { opacity: 1, transform: 'translate3d(0,0px,0)' },
-    config: config.gentle,
-  });
-
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
+  const renderSkeletons = () => {
+    return Array(8).fill(null).map((_, index) => (
+      <Col xs={24} sm={12} md={8} lg={6} key={`skeleton-${index}`}>
+        <Card style={{ height: 160, overflow: 'hidden' }}>
+          <Skeleton active paragraph={{ rows: 2 }} />
+        </Card>
+      </Col>
+    ));
+  };
 
   return (
-    <>
-      <Helmet>
-        <title>Pipelines - Pipeline Manager</title>
-      </Helmet>
-      <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
-        <Typography variant="h4" gutterBottom sx={{ color: 'white', fontWeight: 'bold' }}>
-          Pipelines
-        </Typography>
-        <Grid container spacing={3} justifyContent="start" alignItems="center">
-          {trail.map((style, index) => (
-            <AnimatedGrid
-              size={{xs:12, sm:6, md:4, lg:3}}
-              columnSpacing={{xs:12, sm:6, md:4, lg:3}}
-              rowSpacing={{xs:12, sm:6, md:4, lg:3}}
-              key={pipelines[index].uuid}
-              container
-              justifyContent="center"
-              alignItems="center"
-              style={style}
-            >
-              <Card 
-                sx={{ 
-                  height: '100%',
-                  width: '100%',
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  cursor: 'pointer'
-                }}
-                onClick={() => handlePipelineClick(pipelines[index].uuid)}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Input
+          placeholder="Search pipelines"
+          prefix={<SearchOutlined />}
+          style={{ width: 200 }}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      <Row gutter={[16, 16]}>
+        {loading ? (
+          renderSkeletons()
+        ) : filteredPipelines.length > 0 ? (
+          filteredPipelines.map((pipeline) => (
+            <Col xs={24} sm={12} md={8} lg={6} key={pipeline.uuid}>
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <CardContent sx={{ flexGrow: 1, width: '100%', textAlign: 'left' }}>
-                  <Typography variant="h6" component="div" gutterBottom noWrap>
-                    {pipelines[index].name}
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary"
-                    sx={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      height: '3em',
-                    }}
-                  >
-                    {pipelines[index].description || 'No description available'}
-                  </Typography>
-                  {pipelines[index].status && (
-                    <Box display="flex" justifyContent="center" mt={1}>
-                      <Chip 
-                        label={pipelines[index].status} 
-                        color={pipelines[index].status === 'active' ? 'success' : 'default'}
-                        size="small"
-                      />
-                    </Box>
+                <Card
+                  hoverable
+                  onClick={() => handlePipelineClick(pipeline.uuid)}
+                  style={{ height: 160, overflow: 'hidden' }}
+                >
+                  <Meta
+                    title={pipeline.name}
+                    description={
+                      <Paragraph ellipsis={{ rows: 2 }}>
+                        {pipeline.description || 'No description available'}
+                      </Paragraph>
+                    }
+                  />
+                  {pipeline.status && (
+                    <div style={{ marginTop: '10px' }}>
+                      <Tag color={pipeline.status === 'active' ? 'green' : 'default'}>
+                        {pipeline.status}
+                      </Tag>
+                    </div>
                   )}
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
-                  {/* <Button size="small" variant="contained" startIcon={<PlayArrowIcon />}>
-                    Run
-                  </Button> */}
-                  {pipelines[index].tags && pipelines[index].tags.length > 0 && (
-                    <Box display="flex" flexWrap="wrap" mt={1} gap={0.5}>
-                      {pipelines[index].tags.map((tag, tagIndex) => (
-                        <Chip
-                          key={tagIndex}
-                          label={tag}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
+                  {pipeline.tags && pipeline.tags.length > 0 && (
+                    <div style={{ marginTop: '10px' }}>
+                      {pipeline.tags.map((tag, index) => (
+                        <Tag key={index} color="blue">{tag}</Tag>
                       ))}
-                    </Box>
+                    </div>
                   )}
-                </CardActions>
-              </Card>
-            </AnimatedGrid>
-          ))}
-        </Grid>
-        <Modal
-          open={openModal}
-          onClose={handleCloseModal}
-          aria-labelledby="pipeline-detail-modal"
-          aria-describedby="pipeline-detail-description"
-        >
-          <Paper sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 400,
-            bgcolor: 'background.paper',
-            boxShadow: 24,
-            p: 4,
-          }}>
-            <Typography id="pipeline-detail-modal" variant="h6" component="h2">
-              {selectedPipeline?.name}
-            </Typography>
-            <Typography id="pipeline-detail-description" sx={{ mt: 2 }}>
-              {selectedPipeline?.description || 'No description available'}
-            </Typography>
-            <Typography sx={{ mt: 2 }}>
-              Status: {selectedPipeline?.status || 'Unknown'}
-            </Typography>
-            <Button onClick={handleCloseModal} sx={{ mt: 2 }}>
-              Close
-            </Button>
-          </Paper>
-        </Modal>
-      </Box>
-    </>
+                </Card>
+              </motion.div>
+            </Col>
+          ))
+        ) : (
+          <Col span={24}>
+            <Typography.Text>No pipelines found.</Typography.Text>
+          </Col>
+        )}
+      </Row>
+    </motion.div>
   );
 };
 

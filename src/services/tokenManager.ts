@@ -9,12 +9,31 @@ interface DecodedToken {
   [key: string]: any;
 }
 
+interface UserInfo {
+  id: number;
+  username: string;
+  first_name: string | null;
+  last_name: string;
+  avatar: string | null;
+  roles_display: string;
+}
+
 const TOKEN_KEY = 'authToken';
+const USER_INFO_KEY = 'userInfo';
 
 export const saveToken = (token: string, expiresIn: string) => {
   const expiresAt = new Date().getTime() + parseInt(expiresIn) * 1000;
   const tokenData: TokenData = { token, expiresAt };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
+};
+
+export const saveUserInfo = (userInfo: UserInfo) => {
+  localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
+};
+
+export const getUserInfo = (): UserInfo | null => {
+  const userInfo = localStorage.getItem(USER_INFO_KEY);
+  return userInfo ? JSON.parse(userInfo) : null;
 };
 
 export const getToken = (): string | null => {
@@ -46,7 +65,11 @@ export const decodeToken = (token: string): DecodedToken | null => {
   try {
     return (jwtDecode(token) as DecodedToken)['token'];
   } catch (error) {
-    console.error('Error decoding token:', error);
     return null;
   }
+};
+
+export const clearUserData = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_INFO_KEY);
 };
