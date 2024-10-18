@@ -318,18 +318,6 @@ const PipelineRuns: React.FC = () => {
         transition={{ duration: 0.5 }}
       >
         <Space direction="vertical" size="middle" style={{ display: 'flex', width: '100%' }}>
-          <Affix offsetTop={64}>
-            <div style={{ backgroundColor: '#fff', padding: '16px 0', zIndex: 10 }}>
-              <Title level={2}>{decodeURIComponent(name || '')}</Title>
-              <Tabs defaultActiveKey="1" type="card" style={{ marginBottom: 16 }}>
-                <TabPane tab="Overview" key="1" />
-                <TabPane tab="Card View" key="2" />
-                <TabPane tab="Timeline View" key="3" />
-                <TabPane tab="Table View" key="4" />
-              </Tabs>
-            </div>
-          </Affix>
-
           <Card>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={8}>
@@ -426,81 +414,86 @@ const PipelineRuns: React.FC = () => {
       
       <Modal
         title={
-          <Space>
-            <FileTextOutlined />
-            <span>Pipeline Run Log</span>
-          </Space>
+          <Affix offsetTop={0}>
+            <div style={{ background: '#fff', padding: '16px', borderBottom: '1px solid #f0f0f0' }}>
+              <Space>
+                <FileTextOutlined />
+                <span>Pipeline Run Log</span>
+              </Space>
+            </div>
+          </Affix>
         }
         open={isLogModalVisible}
         onCancel={() => setIsLogModalVisible(false)}
         footer={null}
         width={1200}
         style={{ top: 20 }}
+        bodyStyle={{ padding: 0, maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}
       >
-        {logData && (
-          <Tabs defaultActiveKey="1" type="card">
-            <TabPane 
+        <div style={{ padding: '16px' }}>
+          {logData && (
+            <Tabs defaultActiveKey="1" type="card">
+              <TabPane
               tab={
                 <span>
                   <CodeOutlined />
                   Block Run Logs
                 </span>
               } 
-              key="1"
-            >
-              <Collapse accordion>
-                {logData.block_run_logs.map((log, index) => (
-                  <Panel 
-                    header={
-                      <Space>
-                        <FileTextOutlined />
-                        <Text strong>{log.name}</Text>
-                        <Tag color="blue">{log.path}</Tag>
-                      </Space>
-                    } 
-                    key={index}
-                  >
-                    <Card
-                      bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+              key="1">
+                <Collapse accordion>
+                  {logData.block_run_logs.map((log, index) => (
+                    <Panel 
+                      header={
+                        <Space>
+                          <FileTextOutlined />
+                          <Text strong>{log.name}</Text>
+                          <Tag color="blue">{log.path}</Tag>
+                        </Space>
+                      } 
+                      key={index}
                     >
-                      {renderLogContent(log.content)}
-                    </Card>
-                  </Panel>
-                ))}
-              </Collapse>
-            </TabPane>
-            <TabPane 
+                      <Card
+                        bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+                      >
+                        {renderLogContent(log.content)}
+                      </Card>
+                    </Panel>
+                  ))}
+                </Collapse>
+              </TabPane>
+              <TabPane
               tab={
                 <span>
                   <CodeOutlined />
                   Pipeline Run Logs
                 </span>
               } 
-              key="2"
-            >
-              <Collapse accordion>
-                {logData.pipeline_run_logs.map((log, index) => (
-                  <Panel 
-                    header={
-                      <Space>
-                        <FileTextOutlined />
-                        <Text strong>{log.name}</Text>
-                        <Tag color="green">{log.path}</Tag>
-                      </Space>
-                    } 
-                    key={index}
-                  >
-                    <Card
-                      bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+              key="2">
+                <Collapse accordion>
+                  {logData.pipeline_run_logs.map((log, index) => (
+                    <Panel 
+                      header={
+                        <Space>
+                          <FileTextOutlined />
+                          <Text strong>{log.name}</Text>
+                          <Tag color="green">{log.path}</Tag>
+                        </Space>
+                      } 
+                      key={index}
                     >
-                      {renderLogContent(log.content)}
-                    </Card>
-                  </Panel>
-                ))}
-              </Collapse>
-            </TabPane>
-          </Tabs>
-        )}
+                      <Card
+                        bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+                      >
+                        {renderLogContent(log.content)}
+                      </Card>
+                    </Panel>
+                  ))}
+                </Collapse>
+              </TabPane>
+            </Tabs>
+          )}
+        </div>
       </Modal>
     </>
   );
