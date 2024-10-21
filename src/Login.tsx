@@ -17,7 +17,7 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (isTokenValid()) {
-      navigate('/pipelines');
+      navigate('/dashboard');
     }
   }, [navigate]);
 
@@ -30,7 +30,7 @@ const Login: React.FC = () => {
         saveUserInfo(response.session.user);
         setUserInfo(response.session.user);
         message.success('Đăng nhập thành công!');
-        navigate('/pipelines');
+        navigate('/dashboard');
       } else {
         throw new Error('Invalid response from server');
       }

@@ -1,0 +1,120 @@
+.dashboard-layout {
+  min-height: 100vh;
+}
+
+.dashboard-content {
+  background-color: #ffffff;
+  min-height: 100vh;
+  /* padding: 24px; */
+}
+
+.content-wrapper {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.dashboard-header h2 {
+  margin-bottom: 8px;
+  color: #1890ff;
+}
+
+.dashboard-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.dashboard-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-card .ant-card-head {
+  background-color: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.statistic-card {
+  height: 100%;
+  transition: all 0.3s;
+  border: none;
+  border-radius: 8px;
+}
+
+.statistic-card:hover {
+  transform: translateY(-5px);
+}
+
+.statistic-card .ant-statistic-title {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.statistic-card .ant-statistic-content {
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.status-icon {
+  font-size: 28px;
+  margin-right: 12px;
+}
+
+.completed-card { background-color: #f6ffed; border-bottom: 3px solid #52c41a; }
+.failed-card { background-color: #fff2f0; border-bottom: 3px solid #f5222d; }
+.running-card { background-color: #e6f7ff; border-bottom: 3px solid #1890ff; }
+.cancelled-card { background-color: #fffbe6; border-bottom: 3px solid #faad14; }
+
+.status-icon.completed { color: #52c41a; }
+.status-icon.failed { color: #f5222d; }
+.status-icon.running { color: #1890ff; }
+.status-icon.cancelled { color: #faad14; }
+
+.chart-container {
+  height: 400px;
+  position: relative;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #ffffff;
+}
+
+.ant-tabs-nav::before {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-tabs-tab {
+  color: rgba(0, 0, 0, 0.65);
+  transition: all 0.3s;
+  font-size: 16px;
+}
+
+.ant-tabs-tab:hover {
+  color: #1890ff;
+}
+
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.ant-tabs-ink-bar {
+  background-color: #1890ff;
+}
+
+.ant-card-head-title h4 {
+  margin-bottom: 0;
+  color: #1890ff;
+}

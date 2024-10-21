@@ -19,7 +19,7 @@ import {
   Alert
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { fetchPipelineSchedules, createPipelineSchedule, updatePipelineSchedule, fetchPipelineVariables } from '../services/api';
+import { createPipelineSchedule, updatePipelineSchedule, fetchPipelineVariables, getPipelineSchedule } from '../services/api';
 import { defineCron } from '../utils/dateUtils';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -80,15 +80,16 @@ const CreateEditTrigger: React.FC = () => {
       if (pipelineId) {
         try {
           const [scheduleData, variablesData] = await Promise.all([
-            scheduleId ? fetchPipelineSchedules(pipelineId) : Promise.resolve(null),
+            scheduleId ? getPipelineSchedule(scheduleId) : Promise.resolve(null),
             fetchPipelineVariables(pipelineId)
           ]);
 
           if (scheduleData) {
-            const schedule = scheduleData.pipeline_schedules.find((s: any) => s.id === parseInt(scheduleId!));
+            const schedule = scheduleData.pipeline_schedule;//.find((s: any) => s.id === parseInt(scheduleId!));
             if (schedule) {
               const scheduleInterval = schedule.schedule_interval;
               const isCustomCron = isCronExpression(scheduleInterval);
+              
               form.setFieldsValue({
                 triggerName: schedule.name,
                 triggerDescription: schedule.description,
@@ -108,18 +109,22 @@ const CreateEditTrigger: React.FC = () => {
               setRuntimeVariables(schedule.runtime_variables || []);
             }
           }
-
+          
           // Xử lý dữ liệu variables
           if (variablesData && variablesData.variables) {
             const relevantVariableGroup = variablesData.variables.find(
               (group: VariableGroup) => group.pipeline.uuid === pipelineId && group.block.uuid === "global"
             );
-            if (relevantVariableGroup) {
+            var variables_Schedule = Object.entries(scheduleData?.pipeline_schedule?.variables || {}).map(([uuid, value]) => ({ uuid, value }));
+            var variables_Pipeline = relevantVariableGroup ? relevantVariableGroup?.variables : [];
+            var variables_Common = [...new Map([...variables_Pipeline, ...variables_Schedule].map(item => [item.uuid, item])).values()];
+            if (variables_Common) {
               // Khởi tạo runtime variables từ pipeline variables
-              setRuntimeVariables(relevantVariableGroup.variables.map((v:any) => ({ uuid: v.uuid, value: v.value || '' })));
+              setRuntimeVariables(variables_Common.map((v:any) => ({ uuid: v.uuid, value: v.value || '' })));
             }
           }
         } catch (err) {
+          console.log(err);
           message.error('Failed to load data. Please try again.');
         }
       }
@@ -149,7 +154,10 @@ const CreateEditTrigger: React.FC = () => {
           skip_if_previous_running: values.skipRun,
           create_initial_pipeline_run: values.createInitialRun, 
         },
-        variables: runtimeVariables,
+        variables: runtimeVariables.reduce<Record<string, string>>((acc, variable) => {
+          acc[variable.uuid] = variable.value;
+          return acc;
+        }, {}),
       };
 
       if (scheduleId) {

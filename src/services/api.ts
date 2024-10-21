@@ -151,6 +151,21 @@ export const deletePipelineSchedule = async (scheduleId: string) => {
   }
 };
 
+
+
+// Thêm hàm này vào cuối file src/services/api.ts
+export const getPipelineSchedule = async (scheduleId: string) => {
+  try {
+    const response = await api.get(`/pipeline_schedules/${scheduleId}`, {
+      params: { api_key: import.meta.env.VITE_API_KEY }
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+
 // Thêm hàm này vào file src/services/api.ts
 export const fetchPipeline = async (pipelineId: string) => {
   try {
@@ -175,6 +190,20 @@ export const fetchPipelineRunLog = async (runId: string) => {
 export const fetchPipelineLogs = async (pipelineUuid: string, runId: string) => {
   try {
     const response = await api.get(`/pipelines/${pipelineUuid}/logs?pipeline_run_id[]=${runId}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const fetchMonitorStats = async (date: string) => {
+  try {
+    const response = await api.get(`/monitor_stats/pipeline_run_count`, {
+      params: {
+        group_by_pipeline_type: 1,
+        start_time: `${date}T00:00:00.000Z`
+      }
+    });
     return response.data;
   } catch (error) {
     throw error;

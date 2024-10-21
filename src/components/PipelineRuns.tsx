@@ -428,7 +428,9 @@ const PipelineRuns: React.FC = () => {
         footer={null}
         width={1200}
         style={{ top: 20 }}
-        bodyStyle={{ padding: 0, maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}
+        styles={{
+          body: { padding: 0, maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }
+        }}
       >
         <div style={{ padding: '16px' }}>
           {logData && (
@@ -454,7 +456,9 @@ const PipelineRuns: React.FC = () => {
                       key={index}
                     >
                       <Card
-                        bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+                        styles={{
+                          body: { maxHeight: '400px', overflow: 'auto' }
+                        }}
                       >
                         {renderLogContent(log.content)}
                       </Card>
@@ -483,7 +487,9 @@ const PipelineRuns: React.FC = () => {
                       key={index}
                     >
                       <Card
-                        bodyStyle={{ maxHeight: '400px', overflow: 'auto' }}
+                        styles={{
+                          body: { maxHeight: '400px', overflow: 'auto' }
+                        }}
                       >
                         {renderLogContent(log.content)}
                       </Card>

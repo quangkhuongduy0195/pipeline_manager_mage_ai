@@ -9,6 +9,7 @@ import PipelineRuns from './components/PipelineRuns';
 import PipelineSchedules from './components/PipelineSchedules';
 import Blocks from './components/Blocks';
 import CreateEditTrigger from './components/CreateEditTrigger';
+import Dashboard from './components/Dashboard';
 import { App as AntApp } from 'antd';
 
 function App() {
@@ -21,7 +22,8 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
-                  <Route index element={<Navigate to="/pipelines" replace />} />
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
                   <Route path="pipelines" element={<Pipelines />} />
                   <Route path="pipelines/:id/schedules" element={<PipelineSchedules />} />
                   <Route path="pipelines/:id/schedules/create" element={<CreateEditTrigger />} />
@@ -30,7 +32,7 @@ function App() {
                   <Route path="pipelines/blocks" element={<Blocks />} />
                 </Route>
               </Route>
-              <Route path="*" element={<Navigate to="/pipelines" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </HeaderProvider>
         </UserProvider>
