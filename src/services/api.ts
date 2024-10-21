@@ -39,6 +39,9 @@ export const login = async (email: string, password: string) => {
     const response = await api.post('/sessions', {
       session: { email, password },
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -48,6 +51,9 @@ export const login = async (email: string, password: string) => {
 export const fetchPipelines = async () => {
   try {
     const response = await api.get('/pipelines');
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -57,6 +63,9 @@ export const fetchPipelines = async () => {
 export const fetchPipelineSchedules = async (pipelineId: string) => {
   try {
     const response = await api.get(`/pipelines/${pipelineId}/pipeline_schedules`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -66,6 +75,9 @@ export const fetchPipelineSchedules = async (pipelineId: string) => {
 export const fetchPipelineRuns = async (scheduleId: string) => {
   try {
     const response = await api.get(`/pipeline_schedules/${scheduleId}/pipeline_runs`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -86,7 +98,10 @@ export const togglePipelineSchedule = async (scheduleId: string, currentStatus: 
         params: { api_key: import.meta.env.VITE_API_KEY }
       }
     );
-    return response.data;
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
+    return response.data; 
   } catch (error) {
     throw error;
   }
@@ -95,6 +110,9 @@ export const togglePipelineSchedule = async (scheduleId: string, currentStatus: 
 export const runPipelineOnce = async (scheduleId: string, token: string) => {
   try {
     const response = await api.post(`/pipeline_schedules/${scheduleId}/pipeline_runs/${token}`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -107,6 +125,9 @@ export const createPipelineSchedule = async (pipelineId: string, name: string) =
       pipeline_schedule: { name },
       api_key: import.meta.env.VITE_API_KEY
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data.pipeline_schedule.id || null; // Giả sử API trả về ID trong trường này
   } catch (error) {
     throw error;
@@ -119,6 +140,9 @@ export const updatePipelineSchedule = async (scheduleId: string, scheduleData: a
       pipeline_schedule: scheduleData,
       api_key: import.meta.env.VITE_API_KEY
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -133,6 +157,9 @@ export default api;
 export const fetchPipelineVariables = async (pipelineId: string) => {
   try {
     const response = await api.get(`/pipelines/${pipelineId}/variables`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -145,6 +172,9 @@ export const deletePipelineSchedule = async (scheduleId: string) => {
     const response = await api.delete(`/pipeline_schedules/${scheduleId}`, {
       params: { api_key: import.meta.env.VITE_API_KEY }
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -159,6 +189,9 @@ export const getPipelineSchedule = async (scheduleId: string) => {
     const response = await api.get(`/pipeline_schedules/${scheduleId}`, {
       params: { api_key: import.meta.env.VITE_API_KEY }
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -170,6 +203,9 @@ export const getPipelineSchedule = async (scheduleId: string) => {
 export const fetchPipeline = async (pipelineId: string) => {
   try {
     const response = await api.get(`/pipelines/${pipelineId}`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data.pipeline;
   } catch (error) {
     throw error;
@@ -180,6 +216,9 @@ export const fetchPipeline = async (pipelineId: string) => {
 export const fetchPipelineRunLog = async (runId: string) => {
   try {
     const response = await api.get(`/pipeline_runs/${runId}/log`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -190,6 +229,9 @@ export const fetchPipelineRunLog = async (runId: string) => {
 export const fetchPipelineLogs = async (pipelineUuid: string, runId: string) => {
   try {
     const response = await api.get(`/pipelines/${pipelineUuid}/logs?pipeline_run_id[]=${runId}`);
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -204,6 +246,9 @@ export const fetchMonitorStats = async (date: string) => {
         start_time: `${date}T00:00:00.000Z`
       }
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;
@@ -216,6 +261,67 @@ export const cancelPipelineRun = async (runId: string) => {
       pipeline_run: { status: 'cancelled' },
       api_key: import.meta.env.VITE_API_KEY
     });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const fetchUsers = async () => {
+  try {
+    const response = await api.get('/users', {
+      params: { api_key: import.meta.env.VITE_API_KEY }
+    });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateUser = async (userId: number, userData: any) => {
+  try {
+    const response = await api.put(`/users/${userId}`, {
+      user: userData,
+      api_key: import.meta.env.VITE_API_KEY
+    });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const createUser = async (userData: any) => {
+  try {
+    const response = await api.post('/users', {
+      user: userData,
+      api_key: import.meta.env.VITE_API_KEY
+    });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId: number) => {
+  try {
+    const response = await api.delete(`/users/${userId}`, {
+      params: { api_key: import.meta.env.VITE_API_KEY }
+    });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
     return response.data;
   } catch (error) {
     throw error;

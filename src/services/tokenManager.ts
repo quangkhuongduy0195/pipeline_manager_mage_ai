@@ -16,6 +16,28 @@ interface UserInfo {
   last_name: string;
   avatar: string | null;
   roles_display: string;
+  owner: boolean;
+  email: string;
+  roles_new: Role[];
+}
+
+interface Role {
+  created_at: string;
+  id: number;
+  name: string;
+  permissions: Permission[];
+  updated_at: string;
+}
+
+interface Permission {
+  access: number;
+  created_at: string;
+  entity: string;
+  entity_id: number | null;
+  entity_name: string | null;
+  entity_type: string | null;
+  id: number;
+  updated_at: string;
 }
 
 const TOKEN_KEY = 'authToken';

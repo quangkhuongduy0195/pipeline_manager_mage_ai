@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout as AntLayout, Menu, theme, Button, Typography, Space, Avatar, Divider, Drawer } from 'antd';
+import { Layout as AntLayout, Menu, theme, Button, Typography, Space, Avatar, Divider, Drawer, Form, Input, message, Card, Tag } from 'antd';
 import {
   MenuUnfoldOutlined,
   MenuFoldOutlined,
@@ -7,17 +7,23 @@ import {
   AccountBookOutlined,
   LogoutOutlined,
   UserOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useHeader } from '../contexts/HeaderContext';
 import { useUser } from '../contexts/UserContext';
 import { clearUserData } from '../services/tokenManager';
+import { updateUser } from '../services/api';
+
 
 const { Header, Sider, Content } = AntLayout;
 const { Text } = Typography;
 
 const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [form] = Form.useForm();
+  // const [collapsed, setCollapsed] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,6 +33,7 @@ const Layout: React.FC = () => {
   } = theme.useToken();
   const { userInfo } = useUser();
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth <= 768);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -46,8 +53,7 @@ const Layout: React.FC = () => {
   const menuItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/pipelines', icon: <AccountBookOutlined />, label: 'Pipelines' },
-    // { key: '/schedules', icon: <ScheduleOutlined />, label: 'Schedules' },
-    // { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
+    { key: '/users', icon: <TeamOutlined />, label: 'Users' },
   ];
 
   const handleBack = () => {
@@ -57,6 +63,33 @@ const Layout: React.FC = () => {
   const handleLogout = () => {
     clearUserData();
     navigate('/login');
+  };
+
+  const onCloseDrawer = () => {
+    setDrawerVisible(false);
+  };
+
+  const onFinish = async (values: any) => {
+    setIsLoading(true);
+    try {
+      await updateUser(userInfo!.id, {
+        password: values.newPassword,
+        password_confirmation: values.confirmPassword,
+        password_current: values.currentPassword,
+        email: userInfo!.email,
+        username: userInfo!.username,
+        first_name: userInfo!.first_name,
+        last_name: userInfo!.last_name,
+        avatar: userInfo!.avatar,
+      });
+      message.success('Password updated successfully');
+      form.resetFields();
+      setDrawerVisible(false);
+    } catch (error) {
+      message.error('Failed to update password');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleDrawer = () => {
@@ -71,8 +104,11 @@ const Layout: React.FC = () => {
         transition: 'all 0.3s',
         height: 'auto',
         minHeight: collapsed ? '80px' : '140px',
-        overflow: 'hidden'
-      }}>
+        overflow: 'hidden',
+        cursor: 'pointer',
+      }}
+      onClick={() => setDrawerVisible(!drawerVisible)}
+    >
         <Avatar 
           size={collapsed ? 48 : 64} 
           icon={<UserOutlined />} 
@@ -84,7 +120,7 @@ const Layout: React.FC = () => {
             <Text strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {userInfo?.username}
             </Text>
-            <Text type="secondary" style={{ fontSize: '12px' }}>{userInfo?.roles_display}</Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>{userInfo?.first_name} {userInfo?.last_name}</Text>
           </>
         )}
       </div>
@@ -93,7 +129,7 @@ const Layout: React.FC = () => {
         theme="light"
         mode="inline"
         selectedKeys={[location.pathname]}
-        items={menuItems}
+        items={menuItems.filter(item => !(item.key === '/users' && userInfo?.owner === false))}
         onClick={({ key }) => {
           navigate(key);
           if (isSmallScreen) {
@@ -201,6 +237,106 @@ const Layout: React.FC = () => {
           <Outlet />
         </Content>
       </AntLayout>
+      <Drawer
+        title={null}
+        placement="right"
+        onClose={onCloseDrawer}
+        open={drawerVisible}
+        width={400}
+        bodyStyle={{ padding: 0, background: '#f0f2f5' }}
+      >
+        <div style={{ 
+          background: 'white', 
+          padding: '32px 24px',
+          borderBottom: '1px solid #e8e8e8'
+        }}>
+          <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+            <Space>
+              <Avatar size={64} src={userInfo?.avatar} icon={<UserOutlined />} />
+              <div>
+                <Typography.Title level={4} style={{ margin: 0 }}>
+                  {`${userInfo?.first_name || ''} ${userInfo?.last_name || ''}`}
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  @{userInfo?.username}
+                </Typography.Text>
+              </div>
+            </Space>
+          </Space>
+        </div>
+
+        <div style={{ padding: '24px' }}>
+          <Card title="Roles" style={{ marginBottom: '24px' }}>
+            {userInfo?.roles_new.map(role => {
+              let color;
+              switch (role.name.toLowerCase()) {
+                case 'editor':
+                  color = 'blue';
+                  break;
+                case 'viewer':
+                  color = 'green';
+                  break;
+                case 'admin':
+                  color = 'red';
+                  break;
+                case 'owner':
+                  color = 'yellow';
+                  break;
+                default:
+                  color = 'default';
+              }
+              return (
+                <Tag color={color} key={role.name} style={{ margin: '4px' }}>
+                  {role.name}
+                </Tag>
+              );
+            })}
+          </Card>
+
+          <Card title="Change Password">
+            <Form form={form} onFinish={onFinish} layout="vertical">
+              <Form.Item
+                name="currentPassword"
+                rules={[{ required: true, message: 'Please input your current password!' }]}
+              >
+                <Input.Password placeholder="Current Password" />
+              </Form.Item>
+              <Form.Item
+                name="newPassword"
+                rules={[
+                  { required: true, message: 'Please input your new password!' },
+                  { min: 6, message: 'Password must be at least 6 characters long' }
+                ]}
+              >
+                <Input.Password placeholder="New Password" />
+              </Form.Item>
+              <Form.Item
+                name="confirmPassword"
+                dependencies={['newPassword']}
+                hasFeedback
+                rules={[
+                  { required: true, message: 'Please confirm your new password!' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('newPassword') === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('The two passwords do not match!'));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password placeholder="Confirm New Password" />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" htmlType="submit" block loading={isLoading}>
+                  Update Password
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+        </div>
+      </Drawer>
     </AntLayout>
   );
 };

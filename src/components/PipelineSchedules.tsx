@@ -38,11 +38,6 @@ interface PipelineSchedule {
   token: string;
 }
 
-interface Pipeline {
-  uuid: string;
-  name: string;
-}
-
 const PipelineSchedules: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -52,7 +47,6 @@ const PipelineSchedules: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const { setTitle, setShowBackButton } = useHeader();
   const isMobile = useMediaQuery({ maxWidth: 767 });
-  const [pipeline, setPipeline] = useState<Pipeline | null>(null);
 
   useEffect(() => {
     setShowBackButton(true);
@@ -65,7 +59,6 @@ const PipelineSchedules: React.FC = () => {
         ]);
         setSchedules(schedulesData.pipeline_schedules);
         setFilteredSchedules(schedulesData.pipeline_schedules);
-        setPipeline(pipelineData);
         setTitle(`Schedules: ${pipelineData.name}`);
         setLoading(false);
       } catch (err) {

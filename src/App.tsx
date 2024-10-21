@@ -10,7 +10,8 @@ import PipelineSchedules from './components/PipelineSchedules';
 import Blocks from './components/Blocks';
 import CreateEditTrigger from './components/CreateEditTrigger';
 import Dashboard from './components/Dashboard';
-import { App as AntApp } from 'antd';
+import Users from './components/Users';
+import { App as AntApp } from 'antd'; 
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
                 <Route element={<Layout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="users" element={<Users />} />
                   <Route path="pipelines" element={<Pipelines />} />
                   <Route path="pipelines/:id/schedules" element={<PipelineSchedules />} />
                   <Route path="pipelines/:id/schedules/create" element={<CreateEditTrigger />} />
