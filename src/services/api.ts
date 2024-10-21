@@ -209,3 +209,15 @@ export const fetchMonitorStats = async (date: string) => {
     throw error;
   }
 };
+
+export const cancelPipelineRun = async (runId: string) => {
+  try {
+    const response = await api.put(`/pipeline_runs/${runId}`, {
+      pipeline_run: { status: 'cancelled' },
+      api_key: import.meta.env.VITE_API_KEY
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

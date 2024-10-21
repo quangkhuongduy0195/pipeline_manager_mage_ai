@@ -20,6 +20,7 @@
     "@types/react-helmet": "^6.1.11",
     "@types/react-router-dom": "^5.3.3",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/styled-components": "^5.1.34",
     "antd": "^5.0.0",
     "axios": "^1.7.7",
     "chart.js": "^4.4.5",
@@ -38,7 +39,8 @@
     "react-router-dom": "^6.27.0",
     "react-spring": "^9.7.4",
     "react-syntax-highlighter": "^15.6.1",
-    "react-toastify": "^10.0.6"
+    "react-toastify": "^10.0.6",
+    "styled-components": "^6.1.13"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",

@@ -1,4 +1,9 @@
 import { format, parseISO } from 'date-fns';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return 'N/A';
@@ -8,6 +13,11 @@ export const formatDate = (dateString: string | null | undefined): string => {
   } catch (error) {
     return 'Invalid Date';
   }
+};
+
+export const formatDateWithTimezone = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'N/A';
+  return dayjs.utc(dateString).local().format('YYYY-MM-DD HH:mm:ss');
 };
 
 export const defineCron = (cronExpression: string): string => {
@@ -45,4 +55,12 @@ export const defineCron = (cronExpression: string): string => {
   }
 
   return description;
+};
+
+export const formatDuration = (start: Date, end: Date): string => {
+  const diff = Math.abs(end.getTime() - start.getTime());
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  return `${hours}h ${minutes}m ${seconds}s`;
 };

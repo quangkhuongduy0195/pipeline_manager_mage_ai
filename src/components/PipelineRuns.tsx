@@ -2,48 +2,45 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Button, 
-  Table, 
   Space, 
-  Typography,
-  Card,
-  List,
-  Tag,
+  Typography, 
+  Card, 
+  Table, 
+  Tag, 
   Row,
   Col,
-  Statistic,
-  Skeleton,
+  Skeleton, 
   message,
-  Modal,
-  Tabs,
-  Timeline,
   Tooltip,
+  Popconfirm,
+  Modal,
+  Statistic,
+  List,
+  Tabs,
   Collapse,
-  Divider,
-  Affix
+  Affix,
+  Badge
 } from 'antd';
 import { 
   CheckCircleOutlined, 
   CloseCircleOutlined, 
-  LoadingOutlined,
-  QuestionCircleOutlined,
-  PauseCircleOutlined,
-  PlayCircleOutlined,
-  EditOutlined,
+  SyncOutlined, 
+  PauseCircleOutlined, 
+  PlayCircleOutlined, 
+  EditOutlined, 
   ClockCircleOutlined,
   FileTextOutlined,
-  CalendarOutlined,
-  FieldTimeOutlined,
+  StopOutlined,
+  QuestionCircleOutlined,
   CodeOutlined
 } from '@ant-design/icons';
-import { fetchPipelineRuns, togglePipelineSchedule, runPipelineOnce, fetchPipelineLogs } from '../services/api';
-import { formatDate } from '../utils/dateUtils';
+import { fetchPipelineRuns, togglePipelineSchedule, runPipelineOnce, cancelPipelineRun, fetchPipelineLogs } from '../services/api';
+import { formatDuration, formatDateWithTimezone } from '../utils/dateUtils';
 import { useHeader } from '../contexts/HeaderContext';
-import { useMediaQuery } from 'react-responsive';
 import { motion } from 'framer-motion';
-import SyntaxHighlighter from 'react-syntax-highlighter';
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { useMediaQuery } from 'react-responsive';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 const { TabPane } = Tabs;
 const { Panel } = Collapse;
 
@@ -55,8 +52,8 @@ interface PipelineRun {
 }
 
 interface LogData {
-  block_run_logs: { name: string; content: string, path: string }[];
-  pipeline_run_logs: { name: string; content: string, path: string }[];
+  block_run_logs: { name: string; path: string; content: string }[];
+  pipeline_run_logs: { name: string; path: string; content: string }[];
 }
 
 const PipelineRuns: React.FC = () => {
@@ -66,13 +63,10 @@ const PipelineRuns: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(initialStatus);
   const { setTitle, setShowBackButton } = useHeader();
-  const isMobile = useMediaQuery({ maxWidth: 767 });
   const [messageApi, contextHolder] = message.useMessage();
-  const [selectedRunLog, setSelectedRunLog] = useState<string | null>(null);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
-  const [pipelineLogs, setPipelineLogs] = useState<string | null>(null);
-  const [isPipelineLogsModalVisible, setIsPipelineLogsModalVisible] = useState(false);
   const [logData, setLogData] = useState<LogData | null>(null);
+  const isMobile = useMediaQuery({ maxWidth: 768 });
 
   useEffect(() => {
     setTitle(`Pipeline Runs: ${decodeURIComponent(name || '')}`);
@@ -92,27 +86,24 @@ const PipelineRuns: React.FC = () => {
     loadPipelineRuns();
   }, [scheduleId, name, setTitle, setShowBackButton, messageApi]);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'completed':
-        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
-      case 'failed':
-        return <CloseCircleOutlined style={{ color: '#f5222d' }} />;
-      case 'running':
-        return <LoadingOutlined style={{ color: '#1890ff' }} />;
-      default:
-        return <QuestionCircleOutlined style={{ color: '#faad14' }} />;
+      case 'completed': return 'success';
+      case 'failed': return 'error';
+      case 'running': return 'processing';
+      case 'initial': return 'warning';
+      default: return 'default';
     }
   };
 
-  const calculateExecutionTime = (startedAt: string | null, completedAt: string | null) => {
-    if (!completedAt || !startedAt) return 'N/A';
-    const start = new Date(startedAt).getTime();
-    const end = new Date(completedAt).getTime();
-    const diff = end - start;
-    const minutes = Math.floor(diff / 60000);
-    const seconds = ((diff % 60000) / 1000).toFixed(0);
-    return `${minutes}m ${seconds}s`;
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed': return <CheckCircleOutlined />;
+      case 'failed': return <CloseCircleOutlined />;
+      case 'running': return <SyncOutlined spin />;
+      case 'initial': return <ClockCircleOutlined />;
+      default: return <QuestionCircleOutlined />;
+    }
   };
 
   const handleDisableTrigger = async () => {
@@ -164,150 +155,142 @@ const PipelineRuns: React.FC = () => {
     }
   };
 
+  const handleCancelRun = async (runId: string) => {
+    try {
+      setLoading(true);
+      await cancelPipelineRun(runId);
+      messageApi.success('Run canceled successfully');
+      const updatedRuns = await fetchPipelineRuns(scheduleId!);
+      setRuns(updatedRuns.pipeline_runs);
+    } catch (err) {
+      console.error('Error cancelling pipeline run:', err);
+      messageApi.error('Failed to cancel pipeline run. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-    },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Space>
-          {getStatusIcon(status)}
-          <span>{status}</span>
-        </Space>
+        <Badge
+          status={getStatusColor(status)}
+          text={
+            <Space>
+              {getStatusIcon(status)}
+              <Text strong>{status.toUpperCase()}</Text>
+            </Space>
+          }
+        />
       ),
+    },
+    {
+      title: 'Run ID',
+      dataIndex: 'id',
+      key: 'id',
     },
     {
       title: 'Started At',
       dataIndex: 'started_at',
       key: 'started_at',
-      render: (date: string | null) => formatDate(date),
+      render: (date: string) => formatDateWithTimezone(date),
     },
     {
       title: 'Finished At',
       dataIndex: 'completed_at',
       key: 'completed_at',
-      render: (date: string | null) => formatDate(date),
+      render: (date: string) => date ? formatDateWithTimezone(date) : '-',
     },
     {
-      title: 'Execution Time',
-      key: 'execution_time',
-      render: (_: any, record: PipelineRun) => calculateExecutionTime(record.started_at, record.completed_at),
+      title: 'Duration',
+      key: 'duration',
+      render: (_: string, record: PipelineRun) => (
+        record.completed_at 
+          ? formatDuration(new Date(record.started_at), new Date(record.completed_at))
+          : formatDuration(new Date(record.started_at), new Date())
+      ),
     },
     {
-      title: 'Logs',
+      title: 'Actions',
       key: 'actions',
-      render: (_: any, record: PipelineRun) => (
-        <Button 
-          icon={<FileTextOutlined />} 
-          onClick={() => handleViewLog(record.id)}
-        >
-          View Log
-        </Button>
+      render: (_: string, record: PipelineRun) => (
+        <Space size="middle">
+          <Button icon={<FileTextOutlined />} onClick={() => handleViewLog(record.id)}>
+            Log
+          </Button>
+          {(record.status.toLowerCase() === 'running' || record.status.toLowerCase() === 'initial') && (
+            <Popconfirm
+              title="Are you sure you want to cancel this run?"
+              onConfirm={() => handleCancelRun(record.id)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button icon={<StopOutlined />} danger>
+                Cancel
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
       ),
     },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed': return 'green';
-      case 'failed': return 'red';
-      case 'running': return 'blue';
-      default: return 'default';
-    }
-  };
+  const renderLogContent = (content: string) => (
+    <pre style={{ maxHeight: '200px', overflow: 'auto' }}>{content}</pre>
+  );
 
   const renderRunCard = (run: PipelineRun) => (
     <Card
       key={run.id}
-      hoverable
       style={{ marginBottom: 16 }}
-    >
-      <Row gutter={[16, 16]} align="middle">
-        <Col span={6}>
-          <Statistic
-            title="Status"
-            value={run.status}
-            valueStyle={{ color: getStatusColor(run.status) }}
-            prefix={getStatusIcon(run.status)}
-          />
-        </Col>
-        <Col span={6}>
-          <Statistic
-            title="Started At"
-            value={formatDate(run.started_at)}
-            prefix={<CalendarOutlined />}
-          />
-        </Col>
-        <Col span={6}>
-          <Statistic
-            title="Finished At"
-            value={run.completed_at ? formatDate(run.completed_at) : 'N/A'}
-            prefix={<CalendarOutlined />}
-          />
-        </Col>
-        <Col span={6}>
-          <Statistic
-            title="Execution Time"
-            value={calculateExecutionTime(run.started_at, run.completed_at)}
-            prefix={<FieldTimeOutlined />}
-          />
-        </Col>
-      </Row>
-      <Row style={{ marginTop: 16 }}>
-        <Col span={24}>
-          <Button 
-            type="primary"
-            icon={<FileTextOutlined />}
-            onClick={() => handleViewLog(run.id)}
+      actions={[
+        <Button icon={<FileTextOutlined />} onClick={() => handleViewLog(run.id)}>View Log</Button>,
+        (run.status.toLowerCase() === 'running' || run.status.toLowerCase() === 'initial') && (
+          <Popconfirm
+            title="Are you sure you want to cancel this run?"
+            onConfirm={() => handleCancelRun(run.id)}
+            okText="Yes"
+            cancelText="No"
           >
-            View Log
-          </Button>
-        </Col>
-      </Row>
+            <Button icon={<StopOutlined />} danger>Cancel</Button>
+          </Popconfirm>
+        )
+      ].filter(Boolean)}
+    >
+      <Card.Meta
+        avatar={
+          <Badge
+            status={getStatusColor(run.status)}
+            text={getStatusIcon(run.status)}
+          />
+        }
+        title={
+          <Space direction="vertical" size={0}>
+            <Text strong>Run ID: {run.id}</Text>
+            <Text type="secondary" style={{ fontSize: '0.9em' }}>
+              {run.status.toUpperCase()}
+            </Text>
+          </Space>
+        }
+        description={
+          <Space direction="vertical">
+            <Text>Started: {formatDateWithTimezone(run.started_at)}</Text>
+            <Text>Finished: {run.completed_at ? formatDateWithTimezone(run.completed_at) : '-'}</Text>
+            <Text>
+              Duration: {
+                run.completed_at 
+                  ? formatDuration(new Date(run.started_at), new Date(run.completed_at))
+                  : formatDuration(new Date(run.started_at), new Date())
+              }
+            </Text>
+          </Space>
+        }
+      />
     </Card>
   );
-
-  const renderTimeline = () => (
-    <Timeline mode="left">
-      {runs.map((run) => (
-        <Timeline.Item
-          key={run.id}
-          color={getStatusColor(run.status)}
-          label={formatDate(run.started_at)}
-        >
-          <Text strong>{`Run ${run.id}`}</Text>
-          <Tag color={getStatusColor(run.status)} style={{ marginLeft: 8 }}>
-            {run.status}
-          </Tag>
-          <br />
-          <Text type="secondary">
-            {`Duration: ${calculateExecutionTime(run.started_at, run.completed_at)}`}
-          </Text>
-          <br />
-          <Button 
-            type="link" 
-            icon={<FileTextOutlined />}
-            onClick={() => handleViewLog(run.id)}
-          >
-            View Log
-          </Button>
-        </Timeline.Item>
-      ))}
-    </Timeline>
-  );
-
-  const renderLogContent = (content: string) => {
-    return (
-      <SyntaxHighlighter language="plaintext" style={docco} showLineNumbers>
-        {content}
-      </SyntaxHighlighter>
-    );
-  };
 
   return (
     <>
@@ -317,7 +300,7 @@ const PipelineRuns: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Space direction="vertical" size="middle" style={{ display: 'flex', width: '100%' }}>
+        <Space direction="vertical" size="large" style={{ display: 'flex', width: '100%' }}>
           <Card>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={8}>
@@ -388,26 +371,29 @@ const PipelineRuns: React.FC = () => {
           {loading ? (
             <Skeleton active />
           ) : (
-            <Tabs defaultActiveKey="1">
-              <TabPane tab="Card View" key="1">
+            <Card>
+              {isMobile ? (
                 <List
-                  grid={{ gutter: 16, xs: 1, sm: 1, md: 1, lg: 1, xl: 1, xxl: 1 }}
                   dataSource={runs}
                   renderItem={renderRunCard}
+                  pagination={{
+                    pageSize: 10,
+                    showQuickJumper: true,
+                  }}
                 />
-              </TabPane>
-              <TabPane tab="Timeline View" key="2">
-                {renderTimeline()}
-              </TabPane>
-              <TabPane tab="Table View" key="3">
+              ) : (
                 <Table 
                   columns={columns} 
-                  dataSource={runs} 
+                  dataSource={runs}
                   rowKey="id"
-                  scroll={{ x: 'max-content' }}
+                  pagination={{
+                    pageSize: 10,
+                    // showSizeChanger: true,
+                    showQuickJumper: true,
+                  }}
                 />
-              </TabPane>
-            </Tabs>
+              )}
+            </Card>
           )}
         </Space>
       </motion.div>

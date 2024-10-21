@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Spin, Tabs, message, Typography, Layout, Tooltip } from 'antd';
+import { Card, Row, Col, Statistic, Spin, Tabs, message, Typography, Layout, Tooltip, Skeleton } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, PauseCircleOutlined, BarChartOutlined } from '@ant-design/icons';
 import { fetchMonitorStats } from '../services/api';
-import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title as ChartTitle, Tooltip as ChartTooltip, Legend, ChartOptions } from 'chart.js';
-import { subDays, format } from 'date-fns';
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title as ChartTitle, Tooltip as ChartTooltip, Legend, ChartOptions } from 'chart.js';
+import { format, subMonths } from 'date-fns';
 import '../styles/Dashboard.css';
 import { useHeader } from '../contexts/HeaderContext';
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTitle, ChartTooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTitle, ChartTooltip, Legend);
 
 interface PipelineTypeStats {
   completed: number;
@@ -54,9 +54,10 @@ const Dashboard: React.FC = () => {
     const fetchStats = async () => {
       try {
         const endDate = new Date();
-        const startDate = subDays(endDate, 6); // 7 days including today
+        //const startDate = subDays(endDate, 6); // 7 days including today
+        const startMonthDate = subMonths(endDate, 1);
         const dates: string[] = [];
-        for (let d = startDate; d <= endDate; d.setDate(d.getDate() + 1)) {
+        for (let d = startMonthDate; d <= endDate; d.setDate(d.getDate() + 1)) {
           dates.push(format(d, 'yyyy-MM-dd'));
         }
 
@@ -153,59 +154,54 @@ const Dashboard: React.FC = () => {
       {
         label: 'Completed',
         data: weeklyStats.map(s => s.completed),
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
         borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
+        borderWidth: 1
       },
       {
         label: 'Failed',
         data: weeklyStats.map(s => s.failed),
+        backgroundColor: 'rgba(255, 99, 132, 0.6)',
         borderColor: 'rgb(255, 99, 132)',
-        tension: 0.1
+        borderWidth: 1
       },
       {
         label: 'Running',
         data: weeklyStats.map(s => s.running),
+        backgroundColor: 'rgba(54, 162, 235, 0.6)',
         borderColor: 'rgb(54, 162, 235)',
-        tension: 0.1
+        borderWidth: 1
       },
       {
         label: 'Cancelled',
         data: weeklyStats.map(s => s.cancelled),
+        backgroundColor: 'rgba(255, 159, 64, 0.6)',
         borderColor: 'rgb(255, 159, 64)',
-        tension: 0.1
+        borderWidth: 1
       }
     ]
   };
 
-  const chartOptions: ChartOptions<'line'> = {
+  const chartOptions: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        position: 'top' as const,
       },
-      tooltip: {
-        mode: 'index' as const,
-        intersect: false,
+      title: {
+        display: true,
+        text: 'Pipeline Run Statistics (Last 7 Days)',
       },
     },
     scales: {
       x: {
-        grid: {
-          display: false,
-        },
+        stacked: true,
       },
       y: {
+        stacked: true,
         beginAtZero: true,
-        grid: {
-          color: 'rgba(0, 0, 0, 0.05)',
-        },
       },
-    },
-    interaction: {
-      mode: 'nearest' as const,
-      axis: 'x' as const,
-      intersect: false,
     },
   };
 
@@ -216,38 +212,68 @@ const Dashboard: React.FC = () => {
     { key: 'standard', label: 'Standard', children: renderStatistics(todayStats.standard) },
   ];
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <Spin size="large" />
-      </div>
-    );
-  }
+  const renderSkeletonStatistics = () => (
+    <Row gutter={[16, 16]}>
+      {[1, 2, 3, 4].map((key) => (
+        <Col xs={24} sm={12} md={6} key={key}>
+          <Card>
+            <Skeleton active paragraph={{ rows: 1 }} />
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
+
+  const renderSkeletonChart = () => (
+    <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Spin size="large" />
+    </div>
+  );
+
+  const renderContent = () => (
+    <>
+      <Card 
+        title={<Title level={4}>Today's Statistics</Title>} 
+        className="dashboard-card"
+      >
+        <Tabs defaultActiveKey="total" items={items} />
+      </Card>
+      
+      <Card 
+        title={<Title level={4}>Weekly Trend</Title>} 
+        className="dashboard-card"
+      >
+        <div className="chart-container">
+          <Bar data={chartData} options={chartOptions} />
+        </div>
+      </Card>
+    </>
+  );
 
   return (
     <Layout className="dashboard-layout">
       <Content className="dashboard-content">
+        <div className="dashboard-header">
+          <Title level={2}>Pipeline Run Statistics</Title>
+          <Text type="secondary">Real-time overview of pipeline performance and status</Text>
+        </div>
         <div className="content-wrapper">
-          <div className="dashboard-header">
-            <Title level={2}>Pipeline Run Statistics</Title>
-            <Text type="secondary">Real-time overview of pipeline performance and status</Text>
-          </div>
-          
-          <Card 
-            title={<Title level={4}>Today's Statistics</Title>} 
-            className="dashboard-card"
-          >
-            <Tabs defaultActiveKey="total" items={items} />
-          </Card>
-          
-          <Card 
-            title={<Title level={4}>Weekly Trend</Title>} 
-            className="dashboard-card"
-          >
-            <div className="chart-container">
-              <Line data={chartData} options={chartOptions} />
-            </div>
-          </Card>
+          {loading ? (
+            <>
+              <Card 
+                title={<Skeleton.Input style={{ width: 200 }} active size="small" />}
+                className="dashboard-card"
+              >
+                {renderSkeletonStatistics()}
+              </Card>
+              <Card 
+                title={<Skeleton.Input style={{ width: 200 }} active size="small" />}
+                className="dashboard-card"
+              >
+                {renderSkeletonChart()}
+              </Card>
+            </>
+          ) : renderContent()}
         </div>
       </Content>
     </Layout>

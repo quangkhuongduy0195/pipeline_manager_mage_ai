@@ -5,8 +5,6 @@ import {
   MenuFoldOutlined,
   DashboardOutlined,
   AccountBookOutlined,
-  ScheduleOutlined,
-  SettingOutlined,
   LogoutOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -48,8 +46,8 @@ const Layout: React.FC = () => {
   const menuItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/pipelines', icon: <AccountBookOutlined />, label: 'Pipelines' },
-    { key: '/schedules', icon: <ScheduleOutlined />, label: 'Schedules' },
-    { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
+    // { key: '/schedules', icon: <ScheduleOutlined />, label: 'Schedules' },
+    // { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
   ];
 
   const handleBack = () => {
@@ -188,7 +186,7 @@ const Layout: React.FC = () => {
                 Back
               </Button>
             )}
-            <Text strong>{title}</Text>
+            {!isSmallScreen && <Text strong>{title}</Text>}
           </Space>
         </Header>
         <Content
