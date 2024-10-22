@@ -11,35 +11,39 @@ import Blocks from './components/Blocks';
 import CreateEditTrigger from './components/CreateEditTrigger';
 import Dashboard from './components/Dashboard';
 import Users from './components/Users';
-import { App as AntApp } from 'antd'; 
+import PipelineHistories from './components/pipeline-histories';
+import { App as AntApp, ConfigProvider } from 'antd'; 
 
 function App() {
   return (
-    <AntApp>
-      <Router>
-        <UserProvider>
-          <HeaderProvider>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<ProtectedRoute />}>
-                <Route element={<Layout />}>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="pipelines" element={<Pipelines />} />
-                  <Route path="pipelines/:id/schedules" element={<PipelineSchedules />} />
-                  <Route path="pipelines/:id/schedules/create" element={<CreateEditTrigger />} />
-                  <Route path="pipelines/:id/schedules/edit/:scheduleId" element={<CreateEditTrigger />} />
-                  <Route path="pipelines/:id/runs/:scheduleId/:name/:token/:status" element={<PipelineRuns />} />
-                  <Route path="pipelines/blocks" element={<Blocks />} />
+    <ConfigProvider>
+      <AntApp>
+        <Router>
+          <UserProvider>
+            <HeaderProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<ProtectedRoute />}>
+                  <Route element={<Layout />}>
+                    <Route index element={<Navigate to="/dashboard" replace />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="pipelines" element={<Pipelines />} />
+                    <Route path="pipelines/:id/schedules" element={<PipelineSchedules />} />
+                    <Route path="pipelines/:id/schedules/create" element={<CreateEditTrigger />} />
+                    <Route path="pipelines/:id/schedules/edit/:scheduleId" element={<CreateEditTrigger />} />
+                    <Route path="pipelines/:id/runs/:scheduleId/:name/:token/:status" element={<PipelineRuns />} />
+                    <Route path="pipelines/blocks" element={<Blocks />} />
+                    <Route path="pipeline-histories" element={<PipelineHistories />} />
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </HeaderProvider>
-        </UserProvider>
-      </Router>
-    </AntApp>
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </HeaderProvider>
+          </UserProvider>
+        </Router>
+      </AntApp>
+    </ConfigProvider>
   );
 }
 

@@ -327,3 +327,27 @@ export const deleteUser = async (userId: number) => {
     throw error;
   }
 };
+
+// Thêm hàm này vào cuối file src/services/api.ts
+export const fetchPipelineRunHistories = async (params: {
+  _limit?: number;
+  _offset?: number;
+  disable_retries_grouping?: boolean;
+  include_pipeline_tags?: boolean;
+  include_pipeline_uuids?: boolean;
+}) => {
+  try {
+    const response = await api.get('/pipeline_runs', {
+      params: {
+        ...params,
+        api_key: import.meta.env.VITE_API_KEY
+      }
+    });
+    if(response.data.error) {
+      throw new Error(response.data.error);
+    }
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

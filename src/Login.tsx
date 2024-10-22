@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Typography, Layout, Space } from 'antd';
+import { Form, Input, Button, Card, Typography, Layout, Space, App } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { login } from './services/api';
@@ -14,6 +14,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { setUserInfo } = useUser();
+  const { message } = App.useApp();
 
   useEffect(() => {
     if (isTokenValid()) {
@@ -24,16 +25,12 @@ const Login: React.FC = () => {
   const onFinish = async (values: { email: string; password: string }) => {
     setLoading(true);
     try {
-      const response = await login(values.email, values.password);
-      if (response.session && response.session.token && response.session.expires) {
-        saveToken(response.session.token, response.session.expires);
-        saveUserInfo(response.session.user);
-        setUserInfo(response.session.user);
-        message.success('Đăng nhập thành công!');
-        navigate('/dashboard');
-      } else {
-        throw new Error('Invalid response from server');
-      }
+      const data = await login(values.email, values.password);
+      saveToken(data.session.token, data.session.expires);
+      saveUserInfo(data.session.user);
+      setUserInfo(data.session.user);
+      message.success('Đăng nhập thành công!');
+      navigate('/dashboard');
     } catch (error) {
       message.error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.');
     } finally {

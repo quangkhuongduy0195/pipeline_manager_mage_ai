@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Avatar, Tag, Popconfirm, Spin } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Modal, Form, Input, Select, message, Avatar, Tag, Popconfirm, Spin, Card, Col, Row } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CalendarOutlined, MailOutlined, TagOutlined } from '@ant-design/icons';
 import { fetchUsers, updateUser, createUser, deleteUser } from '../services/api';
 import { useUser } from '../contexts/UserContext';
 
@@ -58,6 +58,7 @@ const Users: React.FC = () => {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { userInfo } = useUser();
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
 
   useEffect(() => {
     loadUsers();
@@ -226,21 +227,79 @@ const Users: React.FC = () => {
     },
   ];
 
+  const UserCard: React.FC<{ user: User }> = ({ user }) => (
+    <Card
+      hoverable
+      style={{ marginBottom: 16 }}
+      actions={[
+        <Button icon={<EditOutlined />} onClick={() => {
+          setEditingUserId(user.id);
+          form.setFieldsValue({
+            ...user,
+            roles: user.roles_new.map(role => role.name)
+          });
+          setModalVisible(true);
+        }}>
+          Edit
+        </Button>,
+        <Popconfirm
+          title="Are you sure you want to delete this user?"
+          onConfirm={() => handleDelete(user.id)}
+          okText="Yes"
+          cancelText="No"
+        >
+          <Button icon={<DeleteOutlined />} danger>
+            Delete
+          </Button>
+        </Popconfirm>
+      ]}
+    >
+      <Card.Meta
+        avatar={<Avatar src={user.avatar} icon={<UserOutlined />} />}
+        title={user.username}
+        description={
+          <>
+            <p><UserOutlined /> {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A'}</p>
+            <p><MailOutlined /> {user.email}</p>
+            <p><CalendarOutlined /> Created at: {user.created_at}</p>
+            <div><TagOutlined /> {getRoleDisplay(user)}</div>
+          </>
+        }
+      />
+    </Card>
+  );
+
   return (
     <div>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={() => {
-          setEditingUserId(null);
-          form.resetFields();
-          setModalVisible(true);
-        }}
-        style={{ marginBottom: 16 }}
-      >
-        Add User
-      </Button>
-      <Table columns={columns} dataSource={users} loading={loading} rowKey="id" />
+      <Space style={{ marginBottom: 16 }}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setEditingUserId(null);
+            form.resetFields();
+            setModalVisible(true);
+          }}
+        >
+          Create User
+        </Button>
+        {/* <Button onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}>
+          {viewMode === 'table' ? 'Xem dạng thẻ' : 'Xem dạng bảng'}
+        </Button> */}
+      </Space>
+
+      {viewMode === 'table' ? (
+        <Table columns={columns} dataSource={users} loading={loading} rowKey="id" />
+      ) : (
+        <Row gutter={[16, 16]}>
+          {users.map(user => (
+            <Col xs={24} sm={12} md={8} lg={6} key={user.id}>
+              <UserCard user={user} />
+            </Col>
+          ))}
+        </Row>
+      )}
+
       <Modal
         title={editingUserId ? "Edit User" : "Create User"}
         open={modalVisible}

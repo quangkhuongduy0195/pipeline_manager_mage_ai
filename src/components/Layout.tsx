@@ -8,13 +8,14 @@ import {
   LogoutOutlined,
   UserOutlined,
   TeamOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useHeader } from '../contexts/HeaderContext';
 import { useUser } from '../contexts/UserContext';
 import { clearUserData } from '../services/tokenManager';
 import { updateUser } from '../services/api';
-
+import PipelineHistories from './pipeline-histories';
 
 const { Header, Sider, Content } = AntLayout;
 const { Text } = Typography;
@@ -54,6 +55,11 @@ const Layout: React.FC = () => {
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/pipelines', icon: <AccountBookOutlined />, label: 'Pipelines' },
     { key: '/users', icon: <TeamOutlined />, label: 'Users' },
+    {
+      key: '/pipeline-histories',
+      icon: <HistoryOutlined />,
+      label: 'Pipeline Histories',
+    },
   ];
 
   const handleBack = () => {
@@ -234,7 +240,7 @@ const Layout: React.FC = () => {
             minHeight: 280,
           }}
         >
-          <Outlet />
+          {location.pathname === '/pipeline-histories' ? <PipelineHistories /> : <Outlet />}
         </Content>
       </AntLayout>
       <Drawer
@@ -243,7 +249,9 @@ const Layout: React.FC = () => {
         onClose={onCloseDrawer}
         open={drawerVisible}
         width={400}
-        bodyStyle={{ padding: 0, background: '#f0f2f5' }}
+        styles={{
+          body: { padding: 0, background: '#f0f2f5' }
+        }}
       >
         <div style={{ 
           background: 'white', 
