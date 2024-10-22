@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Avatar, Tag, Popconfirm, Spin, Card, Col, Row } from 'antd';
+import { Table, Button, Space, Modal, Form, Input, Select,  Avatar, Tag, Popconfirm, Spin, Card, Col, Row, App } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CalendarOutlined, MailOutlined, TagOutlined } from '@ant-design/icons';
 import { fetchUsers, updateUser, createUser, deleteUser } from '../services/api';
 import { useUser } from '../contexts/UserContext';
-
 const { Option } = Select;
 
 interface Permission {
@@ -51,6 +50,7 @@ interface UserData {
 }
 
 const Users: React.FC = () => {
+  const { message } = App.useApp();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -58,7 +58,7 @@ const Users: React.FC = () => {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { userInfo } = useUser();
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
+  const [viewMode] = useState<'table' | 'card'>('card');
 
   useEffect(() => {
     loadUsers();
