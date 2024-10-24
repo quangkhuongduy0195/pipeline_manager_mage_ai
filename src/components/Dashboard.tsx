@@ -4,7 +4,7 @@ import { CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, PauseCircleOutl
 import { fetchMonitorStats } from '../services/api';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title as ChartTitle, Tooltip as ChartTooltip, Legend, ChartOptions } from 'chart.js';
-import { format, subMonths } from 'date-fns';
+import { format, subDays, eachDayOfInterval } from 'date-fns';
 import '../styles/Dashboard.css';
 import { useHeader } from '../contexts/HeaderContext';
 
@@ -43,82 +43,127 @@ const initialStats: PipelineStats = {
 };
 
 const Dashboard: React.FC = () => {
-    const { setTitle, setShowBackButton } = useHeader();
+  const { setTitle, setShowBackButton } = useHeader();
   const [todayStats, setTodayStats] = useState<PipelineStats>(initialStats);
   const [weeklyStats, setWeeklyStats] = useState<DailyStats[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState({ today: true, weekly: true });
 
   useEffect(() => {
     setTitle('Dashboard');
     setShowBackButton(false);
-    const fetchStats = async () => {
-      try {
-        const endDate = new Date();
-        //const startDate = subDays(endDate, 6); // 7 days including today
-        const startMonthDate = subMonths(endDate, 1);
-        const dates: string[] = [];
-        for (let d = startMonthDate; d <= endDate; d.setDate(d.getDate() + 1)) {
-          dates.push(format(d, 'yyyy-MM-dd'));
-        }
-
-        const statsPromises = dates.map(date => fetchMonitorStats(date));
-        const statsResults = await Promise.all(statsPromises);
-
-        const processedWeeklyStats = statsResults.map((result, index) => {
-          const dailyStats = calculateDailyStats(result.monitor_stat.stats);
-          return { date: dates[index], ...dailyStats };
-        });
-
-        setWeeklyStats(processedWeeklyStats);
-
-        // Set today's stats
-        const todayResult = statsResults[statsResults.length - 1];
-        const todayPipelineStats = calculateStats(todayResult.monitor_stat.stats);
-        setTodayStats(todayPipelineStats);
-      } catch (error) {
-        console.error('Error fetching monitor stats:', error);
-        message.error('Failed to fetch statistics. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
+    fetchTodayStats();
+    fetchWeeklyStats();
   }, []);
 
-  const calculateStats = (data: Record<string, any>): PipelineStats => {
-    const stats: PipelineStats = JSON.parse(JSON.stringify(initialStats));
+  const fetchTodayStats = async () => {
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const result = await fetchMonitorStats(today);
+      const processedStats = processTodayStats(result.monitor_stat.stats);
+      setTodayStats(processedStats);
+    } catch (error) {
+      console.error('Error fetching today\'s statistics:', error);
+      message.error('Unable to fetch today\'s statistics. Please try again later.');
+    } finally {
+      setLoading(prev => ({ ...prev, today: false }));
+    }
+  };
+
+  const fetchWeeklyStats = async () => {
+    try {
+      const endDate = new Date();
+      const startDate = subDays(endDate, 6); // Get data for the last 7 days
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+
+      const result = await fetchMonitorStats(formattedStartDate);
+      const processedStats = processWeeklyStats(result.monitor_stat.stats, startDate, endDate);
+      setWeeklyStats(processedStats);
+    } catch (error) {
+      console.error('Error fetching weekly statistics:', error);
+      message.error('Unable to fetch weekly statistics. Please try again later.');
+    } finally {
+      setLoading(prev => ({ ...prev, weekly: false }));
+    }
+  };
+
+  const processTodayStats = (data: Record<string, any>): PipelineStats => {
+    const stats: PipelineStats = {
+      streaming: { completed: 0, failed: 0, running: 0, cancelled: 0 },
+      integration: { completed: 0, failed: 0, running: 0, cancelled: 0 },
+      standard: { completed: 0, failed: 0, running: 0, cancelled: 0 },
+      total: { completed: 0, failed: 0, running: 0, cancelled: 0 },
+    };
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+
     Object.values(data).forEach((pipeline: any) => {
-      const dateData = pipeline.data[Object.keys(pipeline.data)[0]];
-      Object.entries(dateData).forEach(([pipelineType, typeData]: [string, any]) => {
-        const pipelineCategory = pipelineType === 'streaming' ? 'streaming' :
-                                 pipelineType === 'integration' ? 'integration' : 'standard';
-        Object.entries(typeData).forEach(([status, count]) => {
-          if (typeof count === 'number') {
-            const statusKey = status as keyof PipelineTypeStats;
-            stats[pipelineCategory][statusKey] += count;
-            stats.total[statusKey] += count;
-          }
+      const todayData = pipeline.data[today];
+      if (todayData) {
+        Object.entries(todayData).forEach(([pipelineType, typeData]: [string, any]) => {
+          const category = pipelineType === 'streaming' ? 'streaming' :
+                           pipelineType === 'integration' ? 'integration' : 'standard';
+          Object.entries(typeData).forEach(([status, count]) => {
+            if (typeof count === 'number' && status in stats[category]) {
+              stats[category][status as keyof PipelineTypeStats] += count;
+              stats.total[status as keyof PipelineTypeStats] += count;
+            }
+          });
         });
-      });
+      }
     });
+
     return stats;
   };
 
-  const calculateDailyStats = (data: Record<string, any>): Omit<DailyStats, 'date'> => {
-    const dailyStats = { completed: 0, failed: 0, running: 0, cancelled: 0 };
+  const processWeeklyStats = (data: Record<string, any>, startDate: Date, endDate: Date): DailyStats[] => {
+    const processedStats: Record<string, DailyStats> = {};
+    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+
+    dateRange.forEach(date => {
+      const formattedDate = format(date, 'yyyy-MM-dd');
+      processedStats[formattedDate] = {
+        date: formattedDate,
+        completed: 0,
+        failed: 0,
+        running: 0,
+        cancelled: 0,
+      };
+    });
+
     Object.values(data).forEach((pipeline: any) => {
-      const dateData = pipeline.data[Object.keys(pipeline.data)[0]];
-      Object.values(dateData).forEach((typeData: any) => {
-        Object.entries(typeData).forEach(([status, count]) => {
-          if (typeof count === 'number' && status in dailyStats) {
-            dailyStats[status as keyof typeof dailyStats] += count;
-          }
-        });
+      Object.entries(pipeline.data).forEach(([date, dateData]: [string, any]) => {
+        if (processedStats[date]) {
+          Object.values(dateData).forEach((typeData: any) => {
+            Object.entries(typeData).forEach(([status, count]) => {
+              if (typeof count === 'number' && status in processedStats[date]) {
+                processedStats[date][status as keyof Omit<DailyStats, 'date'>] += count;
+              }
+            });
+          });
+        }
       });
     });
-    return dailyStats;
+
+    return Object.values(processedStats).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
+
+  const renderSkeletonStatistics = () => (
+    <Row gutter={[16, 16]}>
+      {[1, 2, 3, 4].map((key) => (
+        <Col xs={24} sm={12} md={6} key={key}>
+          <Card>
+            <Skeleton active paragraph={{ rows: 1 }} />
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
+
+  const renderSkeletonChart = () => (
+    <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Spin size="large" />
+    </div>
+  );
 
   const renderStatistics = (typeStats: PipelineTypeStats) => (
     <Row gutter={[16, 16]}>
@@ -206,29 +251,11 @@ const Dashboard: React.FC = () => {
   };
 
   const items = [
-    { key: 'total', label: 'Total', children: renderStatistics(todayStats.total) },
-    { key: 'streaming', label: 'Streaming', children: renderStatistics(todayStats.streaming) },
-    { key: 'integration', label: 'Integration', children: renderStatistics(todayStats.integration) },
-    { key: 'standard', label: 'Standard', children: renderStatistics(todayStats.standard) },
+    { key: 'total', label: 'Total', children: loading.today ? renderSkeletonStatistics() : renderStatistics(todayStats.total) },
+    { key: 'streaming', label: 'Streaming', children: loading.today ? renderSkeletonStatistics() : renderStatistics(todayStats.streaming) },
+    { key: 'integration', label: 'Integration', children: loading.today ? renderSkeletonStatistics() : renderStatistics(todayStats.integration) },
+    { key: 'standard', label: 'Standard', children: loading.today ? renderSkeletonStatistics() : renderStatistics(todayStats.standard) },
   ];
-
-  const renderSkeletonStatistics = () => (
-    <Row gutter={[16, 16]}>
-      {[1, 2, 3, 4].map((key) => (
-        <Col xs={24} sm={12} md={6} key={key}>
-          <Card>
-            <Skeleton active paragraph={{ rows: 1 }} />
-          </Card>
-        </Col>
-      ))}
-    </Row>
-  );
-
-  const renderSkeletonChart = () => (
-    <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Spin size="large" />
-    </div>
-  );
 
   const renderContent = () => (
     <>
@@ -244,7 +271,7 @@ const Dashboard: React.FC = () => {
         className="dashboard-card"
       >
         <div className="chart-container">
-          <Bar data={chartData} options={chartOptions} />
+          {loading.weekly ? renderSkeletonChart() : <Bar data={chartData} options={chartOptions} />}
         </div>
       </Card>
     </>
@@ -258,22 +285,7 @@ const Dashboard: React.FC = () => {
           <Text type="secondary">Real-time overview of pipeline performance and status</Text>
         </div>
         <div className="content-wrapper">
-          {loading ? (
-            <>
-              <Card 
-                title={<Skeleton.Input style={{ width: 200 }} active size="small" />}
-                className="dashboard-card"
-              >
-                {renderSkeletonStatistics()}
-              </Card>
-              <Card 
-                title={<Skeleton.Input style={{ width: 200 }} active size="small" />}
-                className="dashboard-card"
-              >
-                {renderSkeletonChart()}
-              </Card>
-            </>
-          ) : renderContent()}
+          {renderContent()}
         </div>
       </Content>
     </Layout>
