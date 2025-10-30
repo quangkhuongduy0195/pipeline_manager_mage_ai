@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { getToken, decodeToken } from './tokenManager';
 
-const API_BASE_URL = 'http://localhost:6789/api';
+const API_BASE_URL = 'http://10.1.14.226:6789/api';
 // const API_KEY = import.meta.env.VITE_API_KEY;
 
 // Đặt withCredentials thành true cho tất cả các yêu cầu Axios

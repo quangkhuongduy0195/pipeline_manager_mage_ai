@@ -8,10 +8,14 @@ WORKDIR /app
 COPY package*.json ./
 
 # Cài đặt các dependencies
-RUN npm install
+# Remove package-lock.json để tránh vấn đề với optional dependencies
+RUN rm -f package-lock.json && npm install --legacy-peer-deps
 
 # Sao chép toàn bộ source code
 COPY . .
+
+# Rebuild native dependencies cho Linux platform
+RUN npm rebuild
 
 # Build ứng dụng
 RUN npm run build
